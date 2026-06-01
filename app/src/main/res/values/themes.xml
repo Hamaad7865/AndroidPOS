@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base theme used before Compose takes over. No action bar; Compose draws all UI. -->
+    <style name="Theme.NexaPOSRetail" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

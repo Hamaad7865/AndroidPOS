@@ -1,0 +1,38 @@
+# Overrides merged on top of detekt's default rules (buildUponDefaultConfig = true).
+# Tuned for an Android + Jetpack Compose + coroutines codebase.
+
+complexity:
+  LongMethod:
+    active: false          # Compose UI functions are legitimately long
+  LongParameterList:
+    active: false          # Composables take many state/callback params
+  TooManyFunctions:
+    active: false
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 20
+    ignoreAnnotated: ['Composable']
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  VariableNaming:
+    privateVariablePattern: '(_)?[a-z][A-Za-z0-9]*'   # allow _backingField
+
+style:
+  MaxLineLength:
+    active: false          # embedded SVG path-data strings can't be wrapped
+  MagicNumber:
+    active: false          # dp values, seed prices, timeouts
+  ReturnCount:
+    active: false
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Composable', 'Preview']
+  ForbiddenComment:
+    active: false
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: true           # intentional broad catches should use @Suppress("TooGenericExceptionCaught")
+  SwallowedException:
+    active: true           # intentional swallowing should use @Suppress("SwallowedException")

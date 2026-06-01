@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Receipts/exports generated for sharing live in cacheDir/shared. -->
+    <cache-path
+        name="shared"
+        path="shared/" />
+</paths>

@@ -1,0 +1,26 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+# Release signing — NEVER commit these
+keystore.properties
+*.jks
+
+# Build outputs (all modules, not just root)
+build/
+.kotlin/
+.cxx/
+
+# Claude Code local state
+.claude/scheduled_tasks.lock
+.claude/settings.local.json

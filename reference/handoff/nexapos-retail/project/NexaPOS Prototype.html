@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>NexaPOS Retail · Interactive Prototype</title>
+  <link rel="stylesheet" href="tokens.css"/>
+  <style>
+    html, body, #root { margin:0; padding:0; height:100%; overflow:hidden; background:#0a0908; }
+    /* Scale the tablet to fit viewport */
+    .proto-stage {
+      width:100vw; height:100vh; display:flex; align-items:center; justify-content:center;
+      background: radial-gradient(ellipse at 50% 40%, #1a1714, #0a0908);
+    }
+    .proto-stage .tablet-frame {
+      transform-origin: center center;
+    }
+    /* Smaller devices: allow horizontal scroll */
+    @media (max-width: 900px) {
+      .proto-stage { align-items: flex-start; justify-content: flex-start; overflow: auto; padding: 20px; }
+    }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="shared.jsx"></script>
+  <script type="text/babel" src="selling.jsx"></script>
+  <script type="text/babel" src="dashboard.jsx"></script>
+  <script type="text/babel" src="products.jsx"></script>
+  <script type="text/babel" src="misc.jsx"></script>
+  <script type="text/babel" src="auth.jsx"></script>
+  <script type="text/babel" src="purchases.jsx"></script>
+  <script type="text/babel" src="money.jsx"></script>
+  <script type="text/babel" src="extras.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    /* ============================================================
+       MAIN PROTOTYPE — single navigable Android tablet
+       ============================================================ */
+    function Prototype() {
+      const [screen, setScreen] = useState("home");
+      const [prevScreen, setPrev] = useState(null);
+      const [theme, setTheme] = useState("light");
+      const [saleData, setSaleData] = useState(null);
+      const [showSearch, setShowSearch] = useState(false);
+      const stageRef = useRef(null);
+      const frameRef = useRef(null);
+
+      // Wire global nav for NavRail
+      window.__nexaNav = useCallback((id) => {
+        const map = { home:"home", pos:"pos", products:"products", parties:"parties",
+                      purchase:"purchases", money:"money", reports:"reports", settings:"settings" };
+        goTo(map[id] || id);
+      }, []);
+
+      const goTo = useCallback((s) => {
+        setPrev(screen);
+        setScreen(s);
+      }, [screen]);
+
+      const onTheme = () => setTheme(t => t==="light"?"dark":"light");
+
+      // Fit-to-viewport scaling
+      const [scale, setScale] = useState(1);
+      useEffect(() => {
+        const fit = () => {
+          if (!stageRef.current) return;
+          const vw = stageRef.current.clientWidth;
+          const vh = stageRef.current.clientHeight;
+          const s = Math.min(vw / 1308, vh / 828, 1); // 1280+28 padding, 800+28 padding
+          setScale(s);
+        };
+        fit();
+        window.addEventListener("resize", fit);
+        return () => window.removeEventListener("resize", fit);
+      }, []);
+
+      // Keyboard: Ctrl+K search, Escape close
+      useEffect(() => {
+        const h = (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setShowSearch(true); }
+          if (e.key === "Escape") setShowSearch(false);
+        };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+      }, []);
+
+      /* Map NavRail "active" from current screen */
+      const activeNav = (() => {
+        if (["home","dashboard"].includes(screen)) return "home";
+        if (["pos","checkout","receipt","sales-list","invoice-detail","sales-return","scanner"].includes(screen)) return "pos";
+        if (["products","add-product","product-detail","low-stock"].includes(screen)) return "products";
+        if (["parties"].includes(screen)) return "parties";
+        if (["purchases","add-purchase","purchase-detail"].includes(screen)) return "purchase";
+        if (["money","income","expense","add-expense","ledger"].includes(screen)) return "money";
+        if (["reports"].includes(screen)) return "reports";
+        if (["settings","staff","business-profile"].includes(screen)) return "settings";
+        return "home";
+      })();
+
+      const commonProps = { theme, onTheme, onGoTo: goTo };
+
+      return (
+        <div className="proto-stage" ref={stageRef}>
+          <div style={{transform:`scale(${scale})`, transformOrigin:"center center"}}>
+            <div className="tablet-frame" ref={frameRef} data-theme={theme}>
+              <div className="screen">
+                <StatusBar theme={theme} onToggle={onTheme}/>
+                <div style={{flex:1,minHeight:0,position:"relative"}}>
+                  {/* ---- HOME / DASHBOARD ---- */}
+                  {screen === "home" && <Dashboard {...commonProps}/>}
+
+                  {/* ---- POS FLOW ---- */}
+                  {screen === "pos" && (
+                    <POSSale {...commonProps}
+                      onCharge={(d) => { setSaleData(d); goTo("checkout"); }}/>
+                  )}
+                  {screen === "checkout" && (
+                    <Checkout data={saleData} {...commonProps}
+                      onBack={()=>goTo("pos")}
+                      onComplete={(d)=>{ setSaleData(d); goTo("receipt"); }}/>
+                  )}
+                  {screen === "receipt" && (
+                    <Receipt data={saleData} {...commonProps}
+                      onBack={()=>goTo("pos")} onNew={()=>goTo("pos")}/>
+                  )}
+                  {screen === "scanner" && <Scanner {...commonProps}/>}
+                  {screen === "sales-list" && <SalesList {...commonProps}/>}
+                  {screen === "invoice-detail" && <InvoiceDetail {...commonProps} onBack={(s)=>goTo(s||"sales-list")}/>}
+                  {screen === "sales-return" && <SalesReturn {...commonProps} onBack={()=>goTo("invoice-detail")}/>}
+
+                  {/* ---- PRODUCTS ---- */}
+                  {screen === "products" && <ProductsList {...commonProps}/>}
+                  {screen === "add-product" && <AddProduct {...commonProps} onBack={()=>goTo("products")}/>}
+                  {screen === "product-detail" && <ProductDetail {...commonProps} onBack={()=>goTo("products")}/>}
+                  {screen === "low-stock" && <LowStock {...commonProps} onBack={()=>goTo("products")}/>}
+
+                  {/* ---- PARTIES ---- */}
+                  {screen === "parties" && <Parties {...commonProps}/>}
+
+                  {/* ---- PURCHASES ---- */}
+                  {screen === "purchases" && <PurchaseList {...commonProps}/>}
+                  {screen === "add-purchase" && <AddPurchase {...commonProps} onBack={()=>goTo("purchases")}/>}
+                  {screen === "purchase-detail" && <PurchaseDetail {...commonProps} onBack={()=>goTo("purchases")}/>}
+
+                  {/* ---- MONEY ---- */}
+                  {screen === "money" && <CashBank {...commonProps}/>}
+                  {screen === "income" && <IncomeList {...commonProps}/>}
+                  {screen === "expense" && <ExpenseList {...commonProps}/>}
+                  {screen === "add-expense" && <AddExpense {...commonProps} onBack={()=>goTo("expense")}/>}
+                  {screen === "ledger" && <LedgerView {...commonProps}/>}
+
+                  {/* ---- REPORTS ---- */}
+                  {screen === "reports" && <Reports {...commonProps}/>}
+
+                  {/* ---- SETTINGS ---- */}
+                  {screen === "settings" && <Settings {...commonProps}/>}
+                  {screen === "staff" && <StaffRoles {...commonProps} onBack={()=>goTo("settings")}/>}
+                  {screen === "business-profile" && <BusinessProfile {...commonProps} onBack={()=>goTo("settings")}/>}
+
+                  {/* ---- AUTH ---- */}
+                  {screen === "splash" && <Splash {...commonProps}/>}
+                  {screen === "login" && <Login {...commonProps}/>}
+                  {screen === "setup" && <BusinessSetup {...commonProps}/>}
+
+                  {/* ---- SEARCH OVERLAY ---- */}
+                  {showSearch && <SearchOverlay onClose={()=>setShowSearch(false)} onGoTo={goTo}/>}
+                </div>
+                <GestureBar/>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<Prototype/>);
+  </script>
+</body>
+</html>

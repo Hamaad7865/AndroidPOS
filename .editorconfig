@@ -1,0 +1,23 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+# Off: the codebase embeds long SVG path-data strings that can't be wrapped.
+max_line_length = off
+# Jetpack Compose: @Composable functions are intentionally PascalCase, and
+# Compose color/typography vals are PascalCase by convention.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+ktlint_standard_function-naming = disabled
+ktlint_standard_property-naming = disabled
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+[*.{yml,yaml,xml,toml,json}]
+indent_size = 2

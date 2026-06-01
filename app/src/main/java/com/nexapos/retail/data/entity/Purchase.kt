@@ -1,0 +1,32 @@
+package com.nexapos.retail.data.entity
+
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(
+    tableName = "purchases",
+    foreignKeys = [
+        ForeignKey(
+            entity = Party::class,
+            parentColumns = ["id"],
+            childColumns = ["supplierId"],
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
+    indices = [Index("supplierId"), Index("createdAt")],
+)
+data class Purchase(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val code: String,
+    val supplierId: Long? = null,
+    /** Supplier name captured at the time of purchase. */
+    val supplierName: String,
+    val createdAt: Long,
+    val itemCount: Int,
+    val totalCents: Long,
+    val paymentMethod: String = "cash",
+    /** received, partial, pending, cancelled. */
+    val status: String = "received",
+)

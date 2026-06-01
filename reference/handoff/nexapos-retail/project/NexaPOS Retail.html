@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=1320"/>
+  <title>NexaPOS Retail · Workshop Precision</title>
+  <link rel="stylesheet" href="tokens.css"/>
+  <style>
+    html, body, #root { height: 100%; min-height: 100vh; }
+    body { background: #f0eee9; }
+    /* override design-canvas card chrome for our tablet/phone frames */
+    .dc-card { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; overflow: visible !important; }
+    .frame-wrap { display:flex; align-items:center; justify-content:center; width:100%; height:100%; }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <script type="text/babel" src="selling.jsx"></script>
+  <script type="text/babel" src="dashboard.jsx"></script>
+  <script type="text/babel" src="products.jsx"></script>
+  <script type="text/babel" src="misc.jsx"></script>
+  <script type="text/babel" src="auth.jsx"></script>
+  <script type="text/babel" src="phone.jsx"></script>
+  <script type="text/babel" src="system.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useMemo, useCallback } = React;
+
+    /* Tablet frame wrapper that hosts an artboard and provides theme + a
+       shared selling-flow state machine (POS → Checkout → Receipt). */
+    function Tablet({ initialScreen="pos", theme: themeProp, sharedTheme, setSharedTheme, sharedFlow, setSharedFlow }) {
+      // Per-artboard theme override (some artboards forcibly light/dark).
+      const [localTheme, setLocalTheme] = useState(themeProp || sharedTheme);
+      const theme = themeProp || localTheme;
+      const onTheme = () => {
+        if (themeProp) return; // fixed
+        setLocalTheme(t => t === "light" ? "dark" : "light");
+      };
+
+      const [screen, setScreen] = useState(initialScreen);
+      const [data, setData] = useState(null);
+
+      return (
+        <div className="tablet-frame" data-theme={theme}>
+          <div className="screen">
+            <StatusBar theme={theme} onToggle={onTheme}/>
+            <div style={{flex:1,minHeight:0}}>
+              {screen === "pos" && (
+                <POSSale theme={theme} onTheme={onTheme}
+                         onCharge={(d) => { setData(d); setScreen("checkout"); }} />
+              )}
+              {screen === "checkout" && (
+                <Checkout data={data} theme={theme} onTheme={onTheme}
+                          onBack={()=>setScreen("pos")}
+                          onComplete={(d)=>{ setData(d); setScreen("receipt"); }}/>
+              )}
+              {screen === "receipt" && (
+                <Receipt data={data} theme={theme} onTheme={onTheme}
+                         onBack={()=>setScreen("pos")} onNew={()=>setScreen("pos")}/>
+              )}
+              {screen === "dashboard" && <Dashboard theme={theme} onTheme={onTheme} onGoTo={(s)=>setScreen(s)}/>}
+              {screen === "products" && <ProductsList theme={theme} onTheme={onTheme} onGoTo={(s)=>setScreen(s)}/>}
+              {screen === "add-product" && <AddProduct theme={theme} onTheme={onTheme} onBack={()=>setScreen("products")}/>}
+              {screen === "reports" && <Reports theme={theme} onTheme={onTheme}/>}
+              {screen === "sales-list" && <SalesList theme={theme} onTheme={onTheme}/>}
+              {screen === "parties" && <Parties theme={theme} onTheme={onTheme}/>}
+              {screen === "settings" && <Settings theme={theme} onTheme={onTheme}/>}
+              {screen === "scanner" && <Scanner theme={theme} onTheme={onTheme}/>}
+              {screen === "login" && <Login theme={theme} onTheme={onTheme}/>}
+              {screen === "setup" && <BusinessSetup theme={theme} onTheme={onTheme}/>}
+              {screen === "splash" && <Splash theme={theme} onTheme={onTheme}/>}
+            </div>
+            <GestureBar/>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <DesignCanvas
+          title="NexaPOS Retail · Workshop Precision"
+          subtitle="Android-first POS · Inventory · Accounting. Tablet shells are a 10″ Android tablet in landscape (1280×800, gesture-nav); phone shells are Android portrait. Tap a product on the POS artboard → it flies into the ticket. Charge → checkout → receipt with PAID stamp. Toggle Daylight ↔ Counter Mode from any status bar."
+        >
+
+          <DCSection id="hero" title="A. Selling flow · Android tablet (10″, landscape)" subtitle="POS Sale · Checkout · Receipt — the 1-2 taps that matter. Try clicking products on the POS artboard.">
+            <DCArtboard id="pos-light" label="POS Sale · Daylight · interactive" width={1280} height={800}>
+              <Tablet initialScreen="pos" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="pos-dark" label="POS Sale · Counter Mode · interactive" width={1280} height={800}>
+              <Tablet initialScreen="pos" theme="dark"/>
+            </DCArtboard>
+            <DCArtboard id="checkout" label="Checkout · numeric keypad" width={1280} height={800}>
+              <Tablet initialScreen="checkout" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="receipt" label="Sale complete · PAID stamp + receipt slide-up" width={1280} height={800}>
+              <Tablet initialScreen="receipt" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="scanner" label="Barcode scanner" width={1280} height={800}>
+              <Tablet initialScreen="scanner" theme="dark"/>
+            </DCArtboard>
+            <DCArtboard id="sales-list" label="Sales list (invoice history)" width={1280} height={800}>
+              <Tablet initialScreen="sales-list" theme="light"/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="dash" title="B. Dashboard & insight · Android tablet" subtitle="Owner view — KPI band, sales-vs-purchase chart, top movers, live activity.">
+            <DCArtboard id="dash-light" label="Dashboard · Daylight" width={1280} height={800}>
+              <Tablet initialScreen="dashboard" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="dash-dark" label="Dashboard · Counter Mode" width={1280} height={800}>
+              <Tablet initialScreen="dashboard" theme="dark"/>
+            </DCArtboard>
+            <DCArtboard id="reports" label="Reports hub · featured P&L" width={1280} height={800}>
+              <Tablet initialScreen="reports" theme="light"/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="inv" title="C. Inventory · Android tablet" subtitle="Browse 62 SKUs, then add a new product via the 5-step setup.">
+            <DCArtboard id="products" label="Products list" width={1280} height={800}>
+              <Tablet initialScreen="products" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="add-product" label="Add product · 5-step wizard" width={1280} height={800}>
+              <Tablet initialScreen="add-product" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="parties" label="Parties · customers & suppliers" width={1280} height={800}>
+              <Tablet initialScreen="parties" theme="light"/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="auth" title="D. Auth & first-run" subtitle="Splash, sign-in, and the business setup wizard new shops walk through.">
+            <DCArtboard id="splash" label="Splash" width={1280} height={800}>
+              <Tablet initialScreen="splash" theme="dark"/>
+            </DCArtboard>
+            <DCArtboard id="login" label="Sign in" width={1280} height={800}>
+              <Tablet initialScreen="login" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="setup" label="Business setup · step 3 of 6" width={1280} height={800}>
+              <Tablet initialScreen="setup" theme="light"/>
+            </DCArtboard>
+            <DCArtboard id="settings" label="Settings hub" width={1280} height={800}>
+              <Tablet initialScreen="settings" theme="light"/>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="phone" title="E. Android phone (portrait) variants" subtitle="Bottom-nav app for the owner on the go and a backup counter device.">
+            <DCArtboard id="phone-pos" label="Phone · POS with bottom-sheet ticket" width={380} height={800}>
+              <div className="frame-wrap"><PhonePOS theme="light"/></div>
+            </DCArtboard>
+            <DCArtboard id="phone-dash" label="Phone · Dashboard" width={380} height={800}>
+              <div className="frame-wrap"><PhoneDashboard theme="light"/></div>
+            </DCArtboard>
+            <DCArtboard id="phone-receipt" label="Phone · Sale complete · PAID stamp" width={380} height={800}>
+              <div className="frame-wrap"><PhoneReceipt theme="light"/></div>
+            </DCArtboard>
+            <DCArtboard id="phone-pos-dark" label="Phone · POS · Counter Mode" width={380} height={800}>
+              <div className="frame-wrap"><PhonePOS theme="dark"/></div>
+            </DCArtboard>
+            <DCArtboard id="phone-dash-dark" label="Phone · Dashboard · Counter Mode" width={380} height={800}>
+              <div className="frame-wrap"><PhoneDashboard theme="dark"/></div>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="ds" title="F. Workshop Precision · the design system" subtitle="Colour, type, components, motion — every screen above is built from this.">
+            <DCArtboard id="ds-light" label="Design system · Daylight" width={1240} height={2200}>
+              <div data-theme="light" style={{height:"100%",background:"var(--bg)"}}><DesignSystem theme="light" onTheme={()=>{}}/></div>
+            </DCArtboard>
+            <DCArtboard id="ds-dark" label="Design system · Counter Mode" width={1240} height={2200}>
+              <div data-theme="dark" style={{height:"100%",background:"var(--bg)"}}><DesignSystem theme="dark" onTheme={()=>{}}/></div>
+            </DCArtboard>
+          </DCSection>
+
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+</body>
+</html>
