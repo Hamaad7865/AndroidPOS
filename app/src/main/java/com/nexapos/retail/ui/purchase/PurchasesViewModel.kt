@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import com.nexapos.retail.data.entity.Party
 import com.nexapos.retail.data.entity.Product
 import com.nexapos.retail.data.entity.Purchase
-import com.nexapos.retail.data.entity.PurchaseItem
 import com.nexapos.retail.domain.repository.CatalogRepository
 import com.nexapos.retail.domain.repository.PartiesRepository
 import com.nexapos.retail.domain.repository.PurchasesRepository
@@ -110,59 +109,17 @@ class PurchasesViewModel(
     ) {
         if (supplierName.isBlank() || items.isEmpty()) return
         viewModelScope.launch {
-            // Auto-create the supplier if it doesn't exist yet — keeps the
-            // parties list honest when the cashier types a new name on the form.
-            val trimmedName = supplierName.trim()
-            if (findSupplier(trimmedName) == null) addSupplier(trimmedName)
-
-            // Auto-create any brand-new product names so they land in the catalog
-            // and the PO line can link to a real productId (which is what makes
-            // stock adjustments work — see RoomPurchasesRepository.recordPurchase).
-            // Lookup is case-insensitive against the cached catalog snapshot.
-            val nameToId =
-                products.associate { it.name.lowercase() to it.id }.toMutableMap()
-            items.forEach { draft ->
-                val key = draft.name.trim().lowercase()
-                if (key.isNotEmpty() && nameToId[key] == null) {
-                    val unitCostCents = draft.unitCostRupees * CENTS_PER_RUPEE
-                    val newId =
-                        catalogRepository.upsert(
-                            Product(
-                                name = draft.name.trim(),
-                                priceCents = unitCostCents,
-                                costCents = unitCostCents,
-                                stockQty = 0,
-                                isActive = true,
-                            ),
-                        )
-                    nameToId[key] = newId
-                }
-            }
-
-            val lines =
-                items.map { draft ->
-                    PurchaseItem(
-                        purchaseId = 0,
-                        productId = nameToId[draft.name.trim().lowercase()],
-                        nameSnapshot = draft.name.trim(),
-                        unitCostCents = draft.unitCostRupees * CENTS_PER_RUPEE,
-                        quantity = draft.quantity,
-                        lineTotalCents = draft.quantity * draft.unitCostRupees * CENTS_PER_RUPEE,
-                    )
-                }
-            val purchase =
-                Purchase(
-                    code = "PO-%04d".format(NEXT_CODE_BASE + orderCount),
-                    supplierName = trimmedName,
-                    createdAt = System.currentTimeMillis(),
-                    itemCount = items.sumOf { it.quantity },
-                    totalCents = lines.sumOf { it.lineTotalCents },
-                    paymentMethod = paymentMethod,
-                    status = status,
-                    expectedDelivery = expectedDelivery.trim(),
-                    notes = notes.trim(),
-                )
-            purchasesRepository.recordPurchase(purchase, lines)
+            recordPurchaseFromDraft(
+                purchasesRepository,
+                catalogRepository,
+                partiesRepository,
+                supplierName,
+                paymentMethod,
+                items,
+                status,
+                expectedDelivery,
+                notes,
+            )
         }
     }
 
@@ -178,6 +135,5 @@ class PurchasesViewModel(
 
     private companion object {
         const val CENTS_PER_RUPEE = 100L
-        const val NEXT_CODE_BASE = 1043
     }
 }
