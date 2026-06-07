@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -388,10 +387,12 @@ private fun ProductCard(
             fontSize = 13.5.sp,
             fontWeight = FontWeight.SemiBold,
             lineHeight = 17.sp,
+            // Reserve exactly two lines so every card is the same height regardless of
+            // name length (1-line names no longer make shorter cards → no staircase).
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             color = c.ink,
-            modifier = Modifier.heightIn(min = 34.dp),
         )
         Row(
             Modifier.fillMaxWidth(),
