@@ -8,3 +8,12 @@
 # TODO: if runtime reflection errors appear for DAOs or migrations, add targeted
 #       -keep rules per class rather than re-broadening to data.**.
 -keep class com.nexapos.retail.data.entity.** { *; }
+
+# SQLCipher (net.zetetic:android-database-sqlcipher). The native libsqlcipher.so
+# resolves Java fields/methods BY NAME via JNI — e.g. SQLiteDatabase.mNativeHandle
+# inside register_android_database_SQLiteCompiledSql / JNI_OnLoad. If R8 renames or
+# strips them the app hard-aborts (SIGABRT, NoSuchFieldError) the first time it opens
+# the encrypted DB. Keep the whole package verbatim.
+-keep class net.sqlcipher.** { *; }
+-keep interface net.sqlcipher.** { *; }
+-dontwarn net.sqlcipher.**

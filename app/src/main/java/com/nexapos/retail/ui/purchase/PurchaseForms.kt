@@ -125,6 +125,8 @@ fun AddPurchaseScreen(
             paymentMethod = paymentMethod.lowercase().replace(' ', '_'),
             items = draftItems,
             status = statusLabel.lowercase(),
+            expectedDelivery = expectedDelivery,
+            notes = notes,
         )
         if (newProductCount > 0) {
             android.widget.Toast.makeText(
@@ -652,6 +654,13 @@ private fun DetailHeaderCard(
         InfoRow("Created", dayFmt.format(java.util.Date(purchase.createdAt)))
         InfoRow("Payment", purchase.paymentMethod.replace('_', ' ').replaceFirstChar { it.uppercase() })
         InfoRow("Item units", "${purchase.itemCount}")
+        if (purchase.expectedDelivery.isNotBlank()) InfoRow("Expected delivery", purchase.expectedDelivery)
+        if (purchase.notes.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Eyebrow("Notes")
+            Spacer(Modifier.height(4.dp))
+            Text(purchase.notes, fontSize = 13.sp, color = c.ink)
+        }
         Spacer(Modifier.height(16.dp))
         // Quick-action shortcuts for the most common transitions, plus a
         // general "Change status…" that opens the full picker.
