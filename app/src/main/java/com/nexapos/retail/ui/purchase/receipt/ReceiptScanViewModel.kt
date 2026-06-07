@@ -25,10 +25,13 @@ class ReceiptScanViewModel(
     private val catalogRepository: CatalogRepository,
     private val partiesRepository: PartiesRepository,
 ) : ViewModel() {
-    var phase by mutableStateOf(ScanPhase.IDLE); private set
+    var phase by mutableStateOf(ScanPhase.IDLE)
+        private set
     var supplier by mutableStateOf("")
-    var warnings by mutableStateOf<List<String>>(emptyList()); private set
-    var imageName by mutableStateOf<String?>(null); private set
+    var warnings by mutableStateOf<List<String>>(emptyList())
+        private set
+    var imageName by mutableStateOf<String?>(null)
+        private set
     val lines = mutableStateListOf<ReceiptDraftLine>()
 
     private var catalogNames: Set<String> = emptySet()
@@ -47,35 +50,60 @@ class ReceiptScanViewModel(
     val total: Int get() = lines.sumOf { it.quantity * it.unitCostRupees }
 
     /** Runs OCR + parse on a captured image, then moves to REVIEW. */
-    @Suppress("TooGenericExceptionCaught") // best-effort OCR; any failure falls back to manual entry
-    fun onImageCaptured(context: Context, uri: Uri) {
+    @Suppress("TooGenericExceptionCaught", "SwallowedException") // best-effort OCR; any failure falls back to manual entry
+    fun onImageCaptured(
+        context: Context,
+        uri: Uri,
+    ) {
         phase = ScanPhase.PROCESSING
         viewModelScope.launch {
             imageName = withContext(Dispatchers.IO) { ImageStore.save(context, uri, "receipt") }
-            val parsed = try {
-                val ocr = ReceiptOcr.recognise(context, uri)
-                ReceiptParser.parse(ocr)
-            } catch (e: Exception) {
-                ParsedReceipt("", emptyList(), listOf("Couldn't read the image — enter the items manually."))
-            }
+            val parsed =
+                try {
+                    val ocr = ReceiptOcr.recognise(context, uri)
+                    ReceiptParser.parse(ocr)
+                } catch (e: Exception) {
+                    ParsedReceipt("", emptyList(), listOf("Couldn't read the image — enter the items manually."))
+                }
             supplier = parsed.supplierGuess
             warnings = parsed.warnings
-            lines.clear(); lines.addAll(parsed.lines)
+            lines.clear()
+            lines.addAll(parsed.lines)
             phase = ScanPhase.REVIEW
         }
     }
 
-    fun updateLine(index: Int, line: ReceiptDraftLine) { if (index in lines.indices) lines[index] = line }
-    fun removeLine(index: Int) { if (index in lines.indices) lines.removeAt(index) }
-    fun addBlankLine() { lines.add(ReceiptDraftLine("", 1, 0)) }
-    fun reset() { phase = ScanPhase.IDLE; supplier = ""; warnings = emptyList(); imageName = null; lines.clear() }
+    fun updateLine(
+        index: Int,
+        line: ReceiptDraftLine,
+    ) {
+        if (index in lines.indices) lines[index] = line
+    }
+
+    fun removeLine(index: Int) {
+        if (index in lines.indices) lines.removeAt(index)
+    }
+
+    fun addBlankLine() {
+        lines.add(ReceiptDraftLine("", 1, 0))
+    }
+
+    fun reset() {
+        phase = ScanPhase.IDLE
+        supplier = ""
+        warnings = emptyList()
+        imageName = null
+        lines.clear()
+    }
 
     fun register(onDone: () -> Unit) {
         val valid = lines.filter { it.name.isNotBlank() && it.quantity > 0 && it.unitCostRupees > 0 }
         if (supplier.isBlank() || valid.isEmpty()) return
         viewModelScope.launch {
             recordPurchaseFromDraft(
-                purchasesRepository, catalogRepository, partiesRepository,
+                purchasesRepository,
+                catalogRepository,
+                partiesRepository,
                 supplierName = supplier,
                 paymentMethod = "cash",
                 items = valid.map { PurchaseDraftItem(it.name, it.quantity, it.unitCostRupees) },

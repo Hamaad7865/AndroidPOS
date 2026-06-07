@@ -23,15 +23,16 @@ class ReceiptParserTest {
 
     @Test
     fun `excludes total vat and subtotal lines`() {
-        val parsed = ReceiptParser.parse(
-            lines(
-                "Nails 1kg 45",
-                "Subtotal 45",
-                "VAT 15% 6.75",
-                "TOTAL 51.75",
-                "Balance Due 51.75",
-            ),
-        )
+        val parsed =
+            ReceiptParser.parse(
+                lines(
+                    "Nails 1kg 45",
+                    "Subtotal 45",
+                    "VAT 15% 6.75",
+                    "TOTAL 51.75",
+                    "Balance Due 51.75",
+                ),
+            )
         assertEquals(listOf("Nails 1kg"), parsed.lines.map { it.name })
     }
 

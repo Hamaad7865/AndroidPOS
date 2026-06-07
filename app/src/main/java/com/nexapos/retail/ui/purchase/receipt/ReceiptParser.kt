@@ -8,11 +8,13 @@ package com.nexapos.retail.ui.purchase.receipt
 object ReceiptParser {
     private val AMOUNT = Regex("""(?:rs\.?\s*)?(\d[\d.,]*\d|\d)\s*$""", RegexOption.IGNORE_CASE)
     private val LEADING_QTY = Regex("""^\s*(\d{1,3})\s*(?:x|\*)?\s+""", RegexOption.IGNORE_CASE)
-    private val NON_ITEM = Regex(
-        """\b(sub-?total|total|vat|tva|tax|balance|due|change|tendered|cash|amount|discount|rounding)\b""",
-        RegexOption.IGNORE_CASE,
-    )
+    private val NON_ITEM =
+        Regex(
+            """\b(sub-?total|total|vat|tva|tax|balance|due|change|tendered|cash|amount|discount|rounding)\b""",
+            RegexOption.IGNORE_CASE,
+        )
 
+    @Suppress("LoopWithTooManyJumpStatements") // a filter loop; the early-continues read clearly
     fun parse(lines: List<OcrLine>): ParsedReceipt {
         if (lines.isEmpty()) {
             return ParsedReceipt("", emptyList(), listOf("Nothing was read from the image."))
@@ -45,10 +47,11 @@ object ReceiptParser {
             items += ReceiptDraftLine(name = name, quantity = qty, unitCostRupees = unitCost)
         }
 
-        val warnings = buildList {
-            if (items.isEmpty()) add("No item lines were recognised — add them manually.")
-            if (skipped > 0) add("$skipped line(s) couldn't be read clearly — please check.")
-        }
+        val warnings =
+            buildList {
+                if (items.isEmpty()) add("No item lines were recognised — add them manually.")
+                if (skipped > 0) add("$skipped line(s) couldn't be read clearly — please check.")
+            }
         return ParsedReceipt(supplierGuess = supplier, lines = items, warnings = warnings)
     }
 

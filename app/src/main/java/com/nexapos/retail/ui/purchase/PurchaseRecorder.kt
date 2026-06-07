@@ -54,40 +54,43 @@ suspend fun recordPurchaseFromDraft(
         val key = draft.name.trim().lowercase()
         if (key.isNotEmpty() && nameToId[key] == null) {
             val unitCostCents = draft.unitCostRupees * CENTS_PER_RUPEE
-            val newId = catalogRepository.upsert(
-                Product(
-                    name = draft.name.trim(),
-                    priceCents = unitCostCents,
-                    costCents = unitCostCents,
-                    stockQty = 0,
-                    isActive = true,
-                ),
-            )
+            val newId =
+                catalogRepository.upsert(
+                    Product(
+                        name = draft.name.trim(),
+                        priceCents = unitCostCents,
+                        costCents = unitCostCents,
+                        stockQty = 0,
+                        isActive = true,
+                    ),
+                )
             nameToId[key] = newId
         }
     }
 
-    val lines = items.map { draft ->
-        PurchaseItem(
-            purchaseId = 0,
-            productId = nameToId[draft.name.trim().lowercase()],
-            nameSnapshot = draft.name.trim(),
-            unitCostCents = draft.unitCostRupees * CENTS_PER_RUPEE,
-            quantity = draft.quantity,
-            lineTotalCents = draft.quantity * draft.unitCostRupees * CENTS_PER_RUPEE,
-        )
-    }
+    val lines =
+        items.map { draft ->
+            PurchaseItem(
+                purchaseId = 0,
+                productId = nameToId[draft.name.trim().lowercase()],
+                nameSnapshot = draft.name.trim(),
+                unitCostCents = draft.unitCostRupees * CENTS_PER_RUPEE,
+                quantity = draft.quantity,
+                lineTotalCents = draft.quantity * draft.unitCostRupees * CENTS_PER_RUPEE,
+            )
+        }
     val orderCount = purchasesRepository.observeRecent().first().size
-    val purchase = Purchase(
-        code = "PO-%04d".format(NEXT_CODE_BASE + orderCount),
-        supplierName = trimmedName,
-        createdAt = System.currentTimeMillis(),
-        itemCount = items.sumOf { it.quantity },
-        totalCents = lines.sumOf { it.lineTotalCents },
-        paymentMethod = paymentMethod,
-        status = status,
-        expectedDelivery = expectedDelivery.trim(),
-        notes = notes.trim(),
-    )
+    val purchase =
+        Purchase(
+            code = "PO-%04d".format(NEXT_CODE_BASE + orderCount),
+            supplierName = trimmedName,
+            createdAt = System.currentTimeMillis(),
+            itemCount = items.sumOf { it.quantity },
+            totalCents = lines.sumOf { it.lineTotalCents },
+            paymentMethod = paymentMethod,
+            status = status,
+            expectedDelivery = expectedDelivery.trim(),
+            notes = notes.trim(),
+        )
     return purchasesRepository.recordPurchase(purchase, lines)
 }

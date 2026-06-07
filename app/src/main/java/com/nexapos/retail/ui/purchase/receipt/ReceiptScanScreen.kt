@@ -73,6 +73,7 @@ fun ReceiptScanScreen(
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) vm.onImageCaptured(context, uri)
         }
+
     fun launchCamera() {
         val dir = java.io.File(context.cacheDir, "receipts").apply { mkdirs() }
         val file = java.io.File(dir, "capture-${System.currentTimeMillis()}.jpg")
