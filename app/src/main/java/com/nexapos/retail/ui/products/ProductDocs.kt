@@ -162,8 +162,12 @@ internal fun parseCsvTable(text: String): List<List<String>> {
     var row = mutableListOf<String>()
     val field = StringBuilder()
     var inQuotes = false
-    // Strip a leading UTF-8 BOM (common from Excel exports).
-    val s = if (text.startsWith("")) text.substring(1) else text
+    // Strip a leading UTF-8 BOM (common from Excel exports). Compared by code
+    // point (0xFEFF) on purpose: a literal BOM char in source is invisible and
+    // was previously lost in an edit here, leaving startsWith("") — which is
+    // always true and chopped the first character off every CSV (turning the
+    // "Name" header into "ame"), breaking every import.
+    val s = if (text.firstOrNull()?.code == 0xFEFF) text.substring(1) else text
     var i = 0
 
     fun endField() {
