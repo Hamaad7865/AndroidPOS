@@ -12,6 +12,7 @@ import com.nexapos.retail.ui.products.CatalogViewModel
 import com.nexapos.retail.ui.purchase.PurchaseDetailViewModel
 import com.nexapos.retail.ui.purchase.PurchasesViewModel
 import com.nexapos.retail.ui.reports.ReportsViewModel
+import com.nexapos.retail.ui.purchase.receipt.ReceiptScanViewModel
 import com.nexapos.retail.ui.sale.SaleReturnViewModel
 import com.nexapos.retail.ui.sale.SalesListViewModel
 import com.nexapos.retail.ui.sale.SellingViewModel
@@ -81,6 +82,14 @@ object AppViewModelProvider {
             }
             initializer {
                 PurchaseDetailViewModel(purchasesRepository = posApplication().container.purchasesRepository)
+            }
+            initializer {
+                val c = posApplication().container
+                ReceiptScanViewModel(
+                    purchasesRepository = c.purchasesRepository,
+                    catalogRepository = c.catalogRepository,
+                    partiesRepository = c.partiesRepository,
+                )
             }
         }
 }
