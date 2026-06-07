@@ -29,4 +29,8 @@ data class Purchase(
     val paymentMethod: String = "cash",
     /** received, partial, pending, cancelled. */
     val status: String = "received",
+    /** Free-text expected-delivery note captured on the PO (e.g. "Tomorrow, 02 Jun"). */
+    val expectedDelivery: String = "",
+    /** Free-text internal notes captured on the PO. */
+    val notes: String = "",
 )

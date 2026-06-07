@@ -105,6 +105,8 @@ class PurchasesViewModel(
         paymentMethod: String,
         items: List<PurchaseDraftItem>,
         status: String = "received",
+        expectedDelivery: String = "",
+        notes: String = "",
     ) {
         if (supplierName.isBlank() || items.isEmpty()) return
         viewModelScope.launch {
@@ -157,6 +159,8 @@ class PurchasesViewModel(
                     totalCents = lines.sumOf { it.lineTotalCents },
                     paymentMethod = paymentMethod,
                     status = status,
+                    expectedDelivery = expectedDelivery.trim(),
+                    notes = notes.trim(),
                 )
             purchasesRepository.recordPurchase(purchase, lines)
         }

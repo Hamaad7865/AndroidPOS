@@ -149,7 +149,6 @@ private val SECTIONS =
                     ReportItem("sales", "Sales Report", "Every sale with totals and filters", PosIcons.cart),
                     ReportItem("sales-return", "Sales Return Report", "Returns and refunds", PosIcons.refresh),
                     ReportItem("purchase", "Purchase Report", "Every PO with totals and filters", PosIcons.truck),
-                    ReportItem("purchase-return", "Purchase Return Report", "Goods returned to supplier", PosIcons.refresh, available = false),
                     ReportItem("due", "Due Report", "Customers with outstanding balance", PosIcons.bell),
                     ReportItem("daybook", "Day Book", "Every transaction, newest first", PosIcons.report),
                     ReportItem("all-tx", "All Transaction", "Same as Day Book — full chronological feed", PosIcons.report),

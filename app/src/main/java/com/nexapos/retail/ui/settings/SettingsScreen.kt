@@ -93,6 +93,7 @@ fun SettingsScreen(onNav: (String) -> Unit) {
     var businessVat by remember { mutableStateOf(BusinessProfile.vat(context)) }
     var showProfileDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
 
     if (showProfileDialog) {
         BusinessProfileDialog(
@@ -121,8 +122,38 @@ fun SettingsScreen(onNav: (String) -> Unit) {
         )
     }
 
+    if (showHelp) {
+        val cc = PosTheme.colors
+        AlertDialog(
+            onDismissRequest = { showHelp = false },
+            confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Got it") } },
+            title = { Text("Help & support") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("NexaPOS Retail · v1.0.0", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = cc.ink)
+                    Text(
+                        "• Sell: open POS, tap products, then Charge.\n" +
+                            "• Stock: Products → Add product or Import (CSV).\n" +
+                            "• Customers & suppliers: Parties.\n" +
+                            "• Cash in & out and the ledger: Money.\n" +
+                            "• Printable summaries: Reports (export to Excel / PDF).\n" +
+                            "• Back up your data regularly under Data & security below.",
+                        fontSize = 12.5.sp,
+                        color = cc.muted,
+                    )
+                    Text(
+                        "Your staff PIN unlocks the till each time the app opens. " +
+                            "For setup or support, contact your installer.",
+                        fontSize = 12.5.sp,
+                        color = cc.muted,
+                    )
+                }
+            },
+        )
+    }
+
     NavShell(active = "settings", onNav = onNav) {
-        AppBar(title = "Settings", subtitle = "$businessName · v 2.4", right = { SecBtn(null, "Help") })
+        AppBar(title = "Settings", subtitle = "$businessName · v 1.0.0", right = { SecBtn(null, "Help") { showHelp = true } })
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

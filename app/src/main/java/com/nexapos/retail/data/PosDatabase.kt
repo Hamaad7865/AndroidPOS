@@ -37,8 +37,9 @@ import com.nexapos.retail.data.entity.SaleReturnItem
         SaleReturnItem::class,
     ],
     // v5: added unique index on sales.receiptNo; invoice seq now derived in-txn from MAX(receiptNo).
+    // v6: purchases gained expectedDelivery + notes columns.
     // fallbackToDestructiveMigration is active — no production data yet, so a clean rebuild is safe.
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class PosDatabase : RoomDatabase() {
