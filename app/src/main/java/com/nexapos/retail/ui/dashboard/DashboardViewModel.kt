@@ -73,7 +73,7 @@ class DashboardViewModel(
                         .let { (it / CENTS_PER_RUPEE).toInt() }
             }
         }
-        viewModelScope.launch { catalogRepository.observeCategories().collect { categoryCount = it.size } }
+        viewModelScope.launch { catalogRepository.observeCategories().collect { cats -> categoryCount = cats.count { it.parentId == null } } }
         viewModelScope.launch { partiesRepository.observeSupplierCount().collect { supplierCount = it } }
     }
 

@@ -222,7 +222,7 @@ fun PosSaleScreen(
                         ) {
                             CategoryChip("All ${mainSel.name}", selSub == null, vm.products.count { (it.mainCat.ifEmpty { it.cat }) == mainSel.name }) { selSub = null }
                             mainSel.subs.forEach { s ->
-                                CategoryChip(s.name, selSub == s.name, vm.products.count { it.cat == s.name }) { selSub = s.name }
+                                CategoryChip(s.name, selSub == s.name, vm.products.count { (it.mainCat.ifEmpty { it.cat }) == mainSel.name && it.cat == s.name }) { selSub = s.name }
                             }
                         }
                     }
