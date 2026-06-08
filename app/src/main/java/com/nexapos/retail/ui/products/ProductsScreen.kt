@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.nexapos.retail.data.barcode.BarcodeScanner
 import com.nexapos.retail.data.barcode.Ean13
+import com.nexapos.retail.data.entity.VatType
 import com.nexapos.retail.data.media.ImageStore
 import com.nexapos.retail.data.profile.BusinessProfile
 import com.nexapos.retail.ui.components.AppBar
@@ -592,8 +593,7 @@ fun AddProductScreen(
     var cost by remember { mutableStateOf("") }
     var stock by remember { mutableStateOf("") }
     var lowStock by remember { mutableStateOf("5") }
-    var taxInclusive by remember { mutableStateOf(true) }
-    var taxRate by remember { mutableStateOf("15") }
+    var vatType by remember { mutableStateOf(VatType.STANDARD) }
 
     var imageName by remember { mutableStateOf<String?>(null) }
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -625,8 +625,7 @@ fun AddProductScreen(
                 cost = (p.costCents / 100).toString()
                 stock = p.stockQty.toString()
                 lowStock = p.lowStockThreshold.toString()
-                taxInclusive = p.taxInclusive
-                taxRate = p.taxRatePercent.toInt().toString()
+                vatType = VatType.from(p.vatType)
                 imageName = p.imagePath
                 imageBitmap = ImageStore.load(context, p.imagePath)
             }
@@ -653,7 +652,6 @@ fun AddProductScreen(
         if (!canPublish) return
         val stockN = stock.filter { it.isDigit() }.toIntOrNull() ?: 0
         val lowStockN = lowStock.filter { it.isDigit() }.toIntOrNull() ?: 5
-        val taxRateN = taxRate.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0
         vm.saveProduct(
             id = productId,
             name = name,
@@ -669,8 +667,7 @@ fun AddProductScreen(
             model = model,
             rack = rack,
             shelf = shelf,
-            taxRatePercent = taxRateN,
-            taxInclusive = taxInclusive,
+            vatType = vatType.id,
             kind = "generic",
             imagePath = imageName,
         )
@@ -911,32 +908,19 @@ fun AddProductScreen(
                         color = c.muted,
                     )
                 }
-                FormCard("Tax") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        PickerField(
-                            "Tax type",
-                            if (taxInclusive) "Inclusive" else "Exclusive",
-                            options = listOf("Inclusive", "Exclusive"),
-                            onValueChange = { taxInclusive = it == "Inclusive" },
-                            Modifier.weight(1f),
-                            allowFreeText = false,
-                        )
-                        PickerField(
-                            "VAT rate",
-                            taxRate,
-                            options = listOf("0", "15"),
-                            onValueChange = { taxRate = it },
-                            Modifier.weight(1f),
-                            mono = true,
-                        )
-                    }
+                FormCard("VAT") {
+                    PickerField(
+                        "VAT type",
+                        vatType.label,
+                        options = VatType.entries.map { it.label },
+                        onValueChange = { sel -> vatType = VatType.entries.first { it.label == sel } },
+                        Modifier.fillMaxWidth(),
+                        allowFreeText = false,
+                    )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        if (taxInclusive) {
-                            "Inclusive: the sale price above already contains VAT."
-                        } else {
-                            "Exclusive: VAT is added on top of the sale price at the till."
-                        },
+                        "Standard is charged 15% (inclusive). Exempt and Zero-rated are 0% at the till; " +
+                            "the type is recorded for your VAT returns.",
                         fontSize = 11.sp,
                         color = c.muted,
                     )

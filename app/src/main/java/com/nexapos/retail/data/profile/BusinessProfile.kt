@@ -16,6 +16,7 @@ object BusinessProfile {
     private const val KEY_ADDRESS = "address"
     private const val KEY_BRN = "brn"
     private const val KEY_VAT = "vat"
+    private const val KEY_VAT_REGISTERED = "vat_registered"
     private const val KEY_TAGLINE_LEGACY = "tagline" // legacy combined field from earlier builds
 
     const val DEFAULT_NAME = "Your Business"
@@ -30,6 +31,9 @@ object BusinessProfile {
     fun brn(context: Context): String = prefs(context).getString(KEY_BRN, "") ?: ""
 
     fun vat(context: Context): String = prefs(context).getString(KEY_VAT, "") ?: ""
+
+    /** Whether the business charges VAT at all (default true). Off ⇒ a non-VAT client. */
+    fun vatRegistered(context: Context): Boolean = prefs(context).getBoolean(KEY_VAT_REGISTERED, true)
 
     /** True once a business name is set. */
     fun isConfigured(context: Context): Boolean = !prefs(context).getString(KEY_NAME, "").isNullOrBlank()
@@ -46,10 +50,11 @@ object BusinessProfile {
             val legacy = p.getString(KEY_TAGLINE_LEGACY, "")?.trim().orEmpty()
             return if (legacy.isNotEmpty()) listOf(legacy) else emptyList()
         }
+        val vatRegistered = p.getBoolean(KEY_VAT_REGISTERED, true)
         val identifiers =
             listOfNotNull(
                 brn.takeIf { it.isNotEmpty() }?.let { "BRN $it" },
-                vat.takeIf { it.isNotEmpty() }?.let { "VAT $it" },
+                vat.takeIf { it.isNotEmpty() && vatRegistered }?.let { "VAT $it" },
             ).joinToString(" · ")
         return listOfNotNull(
             address.takeIf { it.isNotEmpty() },
@@ -63,12 +68,14 @@ object BusinessProfile {
         address: String,
         brn: String,
         vat: String,
+        vatRegistered: Boolean = true,
     ) {
         prefs(context).edit()
             .putString(KEY_NAME, name.trim())
             .putString(KEY_ADDRESS, address.trim())
             .putString(KEY_BRN, brn.trim())
             .putString(KEY_VAT, vat.trim())
+            .putBoolean(KEY_VAT_REGISTERED, vatRegistered)
             // Clear the legacy combined field so receiptLines() prefers the new ones.
             .remove(KEY_TAGLINE_LEGACY)
             .apply()

@@ -21,6 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -92,6 +94,7 @@ fun SettingsScreen(onNav: (String) -> Unit) {
     var businessAddress by remember { mutableStateOf(BusinessProfile.address(context)) }
     var businessBrn by remember { mutableStateOf(BusinessProfile.brn(context)) }
     var businessVat by remember { mutableStateOf(BusinessProfile.vat(context)) }
+    var businessVatReg by remember { mutableStateOf(BusinessProfile.vatRegistered(context)) }
     var showProfileDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
@@ -102,13 +105,15 @@ fun SettingsScreen(onNav: (String) -> Unit) {
             initialAddress = businessAddress,
             initialBrn = businessBrn,
             initialVat = businessVat,
+            initialVatRegistered = businessVatReg,
             onDismiss = { showProfileDialog = false },
-            onSave = { n, addr, b, v ->
-                BusinessProfile.setProfile(context, n, addr, b, v)
+            onSave = { n, addr, b, v, vr ->
+                BusinessProfile.setProfile(context, n, addr, b, v, vr)
                 businessName = BusinessProfile.name(context)
                 businessAddress = BusinessProfile.address(context)
                 businessBrn = BusinessProfile.brn(context)
                 businessVat = BusinessProfile.vat(context)
+                businessVatReg = BusinessProfile.vatRegistered(context)
                 showProfileDialog = false
             },
         )
@@ -494,17 +499,20 @@ private fun BusinessProfileDialog(
     initialAddress: String,
     initialBrn: String,
     initialVat: String,
+    initialVatRegistered: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String) -> Unit,
+    onSave: (String, String, String, String, Boolean) -> Unit,
 ) {
+    val c = PosTheme.colors
     var name by remember { mutableStateOf(initialName.takeIf { it != BusinessProfile.DEFAULT_NAME } ?: "") }
     var address by remember { mutableStateOf(initialAddress) }
     var brn by remember { mutableStateOf(initialBrn) }
     var vat by remember { mutableStateOf(initialVat) }
+    var vatRegistered by remember { mutableStateOf(initialVatRegistered) }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = { onSave(name, address, brn, vat) }, enabled = name.isNotBlank()) { Text("Save") }
+            TextButton(onClick = { onSave(name, address, brn, vat, vatRegistered) }, enabled = name.isNotBlank()) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         title = { Text("Business profile") },
@@ -516,6 +524,21 @@ private fun BusinessProfileDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     EditableField("BRN", brn, { brn = it }, Modifier.weight(1f), mono = true, placeholder = "C20177445")
                     EditableField("VAT number", vat, { vat = it }, Modifier.weight(1f), mono = true, placeholder = "VAT20188822")
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("VAT-registered", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                        Text("Off = no VAT on sales, receipts or the VAT number", fontSize = 11.sp, color = c.muted)
+                    }
+                    Switch(
+                        checked = vatRegistered,
+                        onCheckedChange = { vatRegistered = it },
+                        colors = SwitchDefaults.colors(checkedTrackColor = c.amber, checkedThumbColor = Color.White),
+                    )
                 }
             }
         },
