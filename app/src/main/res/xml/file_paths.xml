@@ -4,4 +4,5 @@
     <cache-path
         name="shared"
         path="shared/" />
+    <cache-path name="receipts" path="receipts/" />
 </paths>

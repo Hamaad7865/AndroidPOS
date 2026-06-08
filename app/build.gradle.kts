@@ -134,6 +134,7 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.play.services.code.scanner)
+    implementation(libs.mlkit.text.recognition)
 
     implementation(libs.kotlinx.coroutines.android)
 

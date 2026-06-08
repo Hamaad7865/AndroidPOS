@@ -221,7 +221,15 @@ fun PosApp() {
                 vm = viewModel(factory = AppViewModelProvider.Factory),
                 onNav = go,
                 onNewPurchase = { navController.navigate("add-purchase") },
+                onScanReceipt = { go("receipt-scan") },
                 onOpen = { id -> navController.navigate("purchase-detail/$id") },
+            )
+        }
+        composable("receipt-scan") {
+            com.nexapos.retail.ui.purchase.receipt.ReceiptScanScreen(
+                vm = viewModel(factory = AppViewModelProvider.Factory),
+                onNav = go,
+                onBack = { navController.popBackStack() },
             )
         }
         composable(

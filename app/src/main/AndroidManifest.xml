@@ -19,6 +19,8 @@
         <package android:name="com.whatsapp.w4b" />
     </queries>
 
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
     <application
         android:name=".PosApplication"
         android:allowBackup="false"

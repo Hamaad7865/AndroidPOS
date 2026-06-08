@@ -94,6 +94,7 @@ fun PurchaseListScreen(
     vm: PurchasesViewModel,
     onNav: (String) -> Unit,
     onNewPurchase: () -> Unit,
+    onScanReceipt: () -> Unit,
     onOpen: (purchaseId: Long) -> Unit,
 ) {
     val c = PosTheme.colors
@@ -158,6 +159,7 @@ fun PurchaseListScreen(
                             exportLauncher.launch("nexapos-purchases.csv")
                         }
                     }
+                    SecBtn(PosIcons.scan, "Scan receipt", onScanReceipt)
                     PrimaryBtn(PosIcons.plus, "New purchase", onNewPurchase)
                 }
             },
