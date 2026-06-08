@@ -226,7 +226,11 @@ private fun ShareReceiptDialog(
                     fontSize = 12.sp,
                     color = c.muted,
                 )
-                ShareOption(PosIcons.mobile, "SMS", "Opens your default messaging app") {
+                ShareOption(PosIcons.download, "Receipt PDF", "The full receipt as a PDF — send via WhatsApp, email, etc.") {
+                    ReceiptOutput.sharePdf(context, sale)
+                    onDismiss()
+                }
+                ShareOption(PosIcons.mobile, "SMS (text)", "Opens your default messaging app") {
                     ReceiptOutput.sendSms(context, sale.customerPhone, ReceiptOutput.messageText(context, sale))
                     onDismiss()
                 }

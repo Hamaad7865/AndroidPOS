@@ -3,11 +3,12 @@ package com.nexapos.retail.ui.checkout
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
-import android.net.Uri
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.webkit.WebView
@@ -25,12 +26,16 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Turns a completed [SaleSnapshot] into the three shareable outputs offered on
- * the receipt screen:
- *  - [print]    → Android system print dialog (real printer or Save-as-PDF),
- *                 rendering HTML at the width configured in [ReceiptSettings].
- *  - [sharePdf] → renders a compact PDF slip and opens the share sheet.
- *  - [sendSms] / [sendWhatsApp] → open the messaging app pre-filled.
+ * Turns a completed [SaleSnapshot] into the shareable outputs offered on the
+ * receipt screen:
+ *  - [print]    → Android system print dialog (real printer or Save-as-PDF), from
+ *                 the styled HTML in [html].
+ *  - [sharePdf] → renders a styled receipt slip to a PDF file ([renderPdf]) and
+ *                 opens the share sheet (WhatsApp / email — SMS is text-only).
+ *  - [sendSms] / [sendWhatsApp] → open the messaging app pre-filled with text.
+ *
+ * The slip carries the business BRN and VAT registration number (via
+ * [BusinessProfile.receiptLines]) so the sent receipt is a valid VAT receipt.
  */
 object ReceiptOutput {
     private val dateFmt = SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.US)
@@ -65,10 +70,6 @@ object ReceiptOutput {
         return sb.toString()
     }
 
-    // -----------------------------------------------------------------------
-    // Generic plain-text share (account statements, etc.) → system share sheet.
-    // -----------------------------------------------------------------------
-
     /** Opens the system share sheet with a plain-text [body] under [subject]. */
     @Suppress("SwallowedException") // absence of a share target is reported via Toast
     fun shareText(
@@ -89,31 +90,20 @@ object ReceiptOutput {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // SMS — opens the default SMS app pre-filled.
-    // -----------------------------------------------------------------------
-
     @Suppress("SwallowedException") // absence of an SMS app is reported via Toast, not the exception
     fun sendSms(
         context: Context,
         phone: String,
         body: String,
     ) {
-        val uri = Uri.parse("smsto:" + phone.trim())
-        val intent =
-            Intent(Intent.ACTION_SENDTO, uri).apply {
-                putExtra("sms_body", body)
-            }
+        val uri = android.net.Uri.parse("smsto:" + phone.trim())
+        val intent = Intent(Intent.ACTION_SENDTO, uri).apply { putExtra("sms_body", body) }
         try {
             context.startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(context, "No SMS app found on this device.", Toast.LENGTH_LONG).show()
         }
     }
-
-    // -----------------------------------------------------------------------
-    // WhatsApp — prefers the installed app, falls back to the browser/web.
-    // -----------------------------------------------------------------------
 
     @Suppress("SwallowedException") // each failed target falls through to the next; final miss shows a Toast
     fun sendWhatsApp(
@@ -124,13 +114,11 @@ object ReceiptOutput {
         val digits = normalizePhone(phone)
         val url =
             if (digits.isNotEmpty()) {
-                "https://wa.me/$digits?text=" + Uri.encode(body)
+                "https://wa.me/$digits?text=" + android.net.Uri.encode(body)
             } else {
-                "https://api.whatsapp.com/send?text=" + Uri.encode(body)
+                "https://api.whatsapp.com/send?text=" + android.net.Uri.encode(body)
             }
-        val view = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        // Try the consumer app, then WhatsApp Business, then let the OS resolve
-        // (browser → web.whatsapp.com) so it never silently does nothing.
+        val view = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
         for (pkg in listOf("com.whatsapp", "com.whatsapp.w4b", null)) {
             val attempt = Intent(view)
             if (pkg != null) attempt.setPackage(pkg)
@@ -153,14 +141,15 @@ object ReceiptOutput {
     }
 
     // -----------------------------------------------------------------------
-    // Print — system print dialog at the configured paper width.
+    // Print — styled HTML through the system print dialog (printer / save-as-PDF).
     // -----------------------------------------------------------------------
 
     fun print(
         context: Context,
         sale: SaleSnapshot,
     ) {
-        val html = html(context, sale)
+        val paper = ReceiptSettings.paper(context)
+        val widthCss = if (paper == ReceiptSettings.Paper.A4) "190mm" else "${paper.cssWidthMm}mm"
         val webView = WebView(context)
         webView.webViewClient =
             object : WebViewClient() {
@@ -170,21 +159,193 @@ object ReceiptOutput {
                 ) {
                     val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
                     val adapter = view.createPrintDocumentAdapter("receipt-${sale.invoiceNo}")
-                    printManager.print(
-                        "Receipt ${sale.invoiceNo}",
-                        adapter,
-                        PrintAttributes.Builder().build(),
-                    )
+                    printManager.print("Receipt ${sale.invoiceNo}", adapter, PrintAttributes.Builder().build())
                 }
             }
-        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+        webView.loadDataWithBaseURL(null, html(context, sale, widthCss), "text/html", "UTF-8", null)
     }
+
+    // -----------------------------------------------------------------------
+    // PDF — render a styled receipt slip to a file and open the share sheet.
+    // -----------------------------------------------------------------------
+
+    @Suppress("TooGenericExceptionCaught") // any rendering/IO failure is surfaced to the user via Toast
+    fun sharePdf(
+        context: Context,
+        sale: SaleSnapshot,
+    ) {
+        try {
+            sharePdfFile(context, renderPdf(context, sale), sale.invoiceNo)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Could not create the receipt PDF: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @Suppress("SwallowedException") // missing share target is reported via Toast
+    private fun sharePdfFile(
+        context: Context,
+        file: File,
+        invoiceNo: String,
+    ) {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val send =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "Receipt $invoiceNo")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        try {
+            context.startActivity(Intent.createChooser(send, "Share receipt PDF"))
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "No app available to share the PDF.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Draws the styled receipt slip onto a single, content-sized PDF page. */
+    @Suppress("LongMethod") // a receipt is a linear list of rows — clearer drawn top-to-bottom in one place
+    private fun renderPdf(
+        context: Context,
+        sale: SaleSnapshot,
+    ): File {
+        val p = ReceiptPaints
+        val w = PAGE_W
+        val maxText = w - PAD_X * 2
+        val ops = mutableListOf<Pair<Float, (Canvas, Float) -> Unit>>()
+
+        fun lineH(paint: Paint) = paint.textSize * LINE_FACTOR
+
+        fun centre(
+            s: String,
+            paint: Paint,
+        ) =
+            ops.add(lineH(paint) to { c: Canvas, y: Float -> c.drawText(s, w / 2f, y + paint.textSize, paint) })
+
+        fun left(
+            s: String,
+            paint: Paint,
+        ) =
+            ops.add(lineH(paint) to { c: Canvas, y: Float -> c.drawText(fit(s, paint, maxText), PAD_X, y + paint.textSize, paint) })
+
+        fun row(
+            left: String,
+            lp: Paint,
+            right: String,
+            rp: Paint,
+        ) =
+            ops.add(
+                maxOf(lineH(lp), lineH(rp)) to { c: Canvas, y: Float ->
+                    c.drawText(fit(left, lp, maxText * 0.62f), PAD_X, y + lp.textSize, lp)
+                    c.drawText(right, w - PAD_X, y + rp.textSize, rp)
+                },
+            )
+
+        fun dash() =
+            ops.add(DASH_H to { c: Canvas, y: Float -> c.drawLine(PAD_X, y + DASH_H / 2, w - PAD_X, y + DASH_H / 2, p.dash) })
+
+        centre(BusinessProfile.name(context), p.name)
+        BusinessProfile.receiptLines(context).forEach { centre(it, p.sub) }
+        dash()
+        row("Invoice", p.label, sale.invoiceNo, p.valueR)
+        row("Date", p.label, dateFmt.format(Date(sale.createdAt)), p.valueR)
+        row("Customer", p.label, sale.customerName.ifBlank { "Walk-in" }, p.valueR)
+        dash()
+        sale.lines.forEach { l ->
+            left(l.product.name, p.item)
+            row("   ${l.qty} × ${formatNum(l.product.price.toDouble(), 0)}", p.qty, formatNum(l.lineTotal.toDouble(), 0), p.amtR)
+        }
+        dash()
+        row("Subtotal", p.label, money(sale.subtotal), p.valueR)
+        row("VAT 15% (incl.)", p.label, money(sale.vat), p.valueR)
+        if (sale.discount > 0) row("Discount", p.label, money(sale.discount), p.valueR)
+        row("TOTAL", p.totalL, money(sale.total), p.totalR)
+        row("Paid · ${sale.pay}", p.label, money(sale.received), p.valueR)
+        if (sale.creditDue > 0) {
+            row("Balance due", p.totalL, money(sale.creditDue), p.totalR)
+        } else {
+            row("Change", p.label, money(maxOf(0, sale.change)), p.valueR)
+        }
+        dash()
+        ReceiptSettings.footerNote(context).takeIf { it.isNotBlank() }?.let { centre(it, p.foot) }
+        centre("powered by NexaPOS · ${sale.invoiceNo}", p.foot)
+
+        val height = (MARGIN_Y * 2 + ops.sumOf { it.first.toDouble() }).toInt()
+        val doc = PdfDocument()
+        val page = doc.startPage(PdfDocument.PageInfo.Builder(w, height, 1).create())
+        var y = MARGIN_Y
+        ops.forEach { (h, draw) ->
+            draw(page.canvas, y)
+            y += h
+        }
+        doc.finishPage(page)
+
+        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        val file = File(dir, "receipt-${sale.invoiceNo}.pdf")
+        FileOutputStream(file).use { doc.writeTo(it) }
+        doc.close()
+        return file
+    }
+
+    /** Trims [s] with an ellipsis so it fits within [maxW] when drawn with [paint]. */
+    private fun fit(
+        s: String,
+        paint: Paint,
+        maxW: Float,
+    ): String {
+        if (paint.measureText(s) <= maxW) return s
+        var t = s
+        while (t.isNotEmpty() && paint.measureText("$t…") > maxW) t = t.dropLast(1)
+        return "$t…"
+    }
+
+    /** The paints used by [renderPdf]; held once so the renderer stays readable. */
+    private object ReceiptPaints {
+        private val ink = Color.rgb(24, 24, 24)
+        private val grey = Color.rgb(120, 120, 120)
+        private val sans = Typeface.SANS_SERIF
+        private val bold = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        private val mono = Typeface.MONOSPACE
+
+        private fun mk(
+            tf: Typeface,
+            size: Float,
+            col: Int,
+            align: Paint.Align,
+        ) =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = tf
+                textSize = size
+                color = col
+                textAlign = align
+            }
+
+        val name = mk(bold, 21f, ink, Paint.Align.CENTER)
+        val sub = mk(sans, 11f, grey, Paint.Align.CENTER)
+        val label = mk(sans, 12f, ink, Paint.Align.LEFT)
+        val valueR = mk(sans, 12f, ink, Paint.Align.RIGHT)
+        val item = mk(bold, 13f, ink, Paint.Align.LEFT)
+        val qty = mk(mono, 11f, grey, Paint.Align.LEFT)
+        val amtR = mk(mono, 12f, ink, Paint.Align.RIGHT)
+        val totalL = mk(bold, 15f, ink, Paint.Align.LEFT)
+        val totalR = mk(bold, 15f, ink, Paint.Align.RIGHT)
+        val foot = mk(sans, 10f, grey, Paint.Align.CENTER)
+        val dash =
+            Paint().apply {
+                color = Color.rgb(170, 170, 170)
+                strokeWidth = 1.2f
+                pathEffect = DashPathEffect(floatArrayOf(5f, 4f), 0f)
+            }
+    }
+
+    // -----------------------------------------------------------------------
+    // Styled receipt HTML — used by [print].
+    // -----------------------------------------------------------------------
 
     private fun html(
         context: Context,
         sale: SaleSnapshot,
+        widthCss: String,
     ): String {
-        val paper = ReceiptSettings.paper(context)
         val biz = esc(BusinessProfile.name(context))
         val headerLines = BusinessProfile.receiptLines(context).joinToString("") { "<div class=\"sub\">${esc(it)}</div>" }
         val footer = esc(ReceiptSettings.footerNote(context))
@@ -202,9 +363,6 @@ object ReceiptOutput {
             } else {
                 "<tr><td class=\"k\">Change</td><td class=\"amt\">${money(maxOf(0, sale.change))}</td></tr>"
             }
-        // Page width: thermal rolls print edge-to-edge at their physical width;
-        // A4 gets a comfortable slip in the corner.
-        val widthCss = if (paper == ReceiptSettings.Paper.A4) "190mm" else "${paper.cssWidthMm}mm"
         return """
             <!DOCTYPE html><html><head><meta charset="utf-8">
             <style>
@@ -254,134 +412,9 @@ object ReceiptOutput {
     private fun esc(raw: String): String =
         raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    // -----------------------------------------------------------------------
-    // PDF — render a compact monospace slip and open the share sheet.
-    // -----------------------------------------------------------------------
-
-    @Suppress("TooGenericExceptionCaught") // any rendering/IO failure is surfaced to the user via Toast
-    fun sharePdf(
-        context: Context,
-        sale: SaleSnapshot,
-    ) {
-        try {
-            val file = renderPdf(context, sale)
-            val uri =
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val send =
-                Intent(Intent.ACTION_SEND).apply {
-                    type = "application/pdf"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_SUBJECT, "Receipt ${sale.invoiceNo}")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-            context.startActivity(Intent.createChooser(send, "Share receipt PDF"))
-        } catch (e: Exception) {
-            Toast.makeText(context, "Could not create PDF: ${e.message}", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun renderPdf(
-        context: Context,
-        sale: SaleSnapshot,
-    ): File {
-        val cols = COLS_80MM
-        val lines = monoLines(context, sale, cols)
-
-        val paint =
-            Paint().apply {
-                typeface = Typeface.MONOSPACE
-                textSize = TEXT_SIZE
-                color = Color.BLACK
-                isAntiAlias = true
-            }
-        val boldPaint =
-            Paint(paint).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
-
-        val contentWidth = lines.maxOf { paint.measureText(it) }
-        val pageW = (contentWidth + MARGIN_X * 2).toInt().coerceAtLeast(MIN_PAGE_W)
-        val pageH = (MARGIN_TOP + lines.size * LINE_HEIGHT + MARGIN_BOTTOM).toInt()
-
-        val doc = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(pageW, pageH, 1).create()
-        val page = doc.startPage(pageInfo)
-        var y = MARGIN_TOP
-        lines.forEach { line ->
-            val p = if (line.startsWith("TOTAL") || line.startsWith("BALANCE")) boldPaint else paint
-            page.canvas.drawText(line, MARGIN_X, y, p)
-            y += LINE_HEIGHT
-        }
-        doc.finishPage(page)
-
-        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val file = File(dir, "receipt-${sale.invoiceNo}.pdf")
-        FileOutputStream(file).use { doc.writeTo(it) }
-        doc.close()
-        return file
-    }
-
-    /** Monospace receipt lines, [cols] characters wide. Shared by the PDF renderer. */
-    private fun monoLines(
-        context: Context,
-        sale: SaleSnapshot,
-        cols: Int,
-    ): List<String> {
-        val out = mutableListOf<String>()
-        out += center(BusinessProfile.name(context), cols)
-        BusinessProfile.receiptLines(context).forEach { out += center(it, cols) }
-        out += "-".repeat(cols)
-        out += "Invoice: ${sale.invoiceNo}"
-        out += "Date: ${dateFmt.format(Date(sale.createdAt))}"
-        out += "Customer: ${sale.customerName}"
-        out += "-".repeat(cols)
-        sale.lines.forEach { l ->
-            out += l.product.name.take(cols)
-            out += lr("  ${l.qty} x ${formatNum(l.product.price.toDouble(), 0)}", formatNum(l.lineTotal.toDouble(), 0), cols)
-        }
-        out += "-".repeat(cols)
-        out += lr("Subtotal", money(sale.subtotal), cols)
-        out += lr("VAT 15%", money(sale.vat), cols)
-        if (sale.discount > 0) out += lr("Discount", money(sale.discount), cols)
-        out += lr("TOTAL", money(sale.total), cols)
-        out += lr("Paid (${sale.pay})", money(sale.received), cols)
-        if (sale.creditDue > 0) {
-            out += lr("BALANCE DUE", money(sale.creditDue), cols)
-        } else {
-            out += lr("Change", money(maxOf(0, sale.change)), cols)
-        }
-        out += "-".repeat(cols)
-        ReceiptSettings.footerNote(context).chunked(cols).forEach { out += center(it, cols) }
-        out += center("powered by NexaPOS", cols)
-        return out
-    }
-
-    private fun lr(
-        left: String,
-        right: String,
-        cols: Int,
-    ): String {
-        val gap = cols - left.length - right.length
-        return if (gap >= 1) {
-            left + " ".repeat(gap) + right
-        } else {
-            val trimmed = left.take((cols - right.length - 1).coerceAtLeast(0))
-            "$trimmed $right"
-        }
-    }
-
-    private fun center(
-        s: String,
-        cols: Int,
-    ): String {
-        if (s.length >= cols) return s.take(cols)
-        val pad = (cols - s.length) / 2
-        return " ".repeat(pad) + s
-    }
-
-    private const val COLS_80MM = 42
-    private const val TEXT_SIZE = 10f
-    private const val LINE_HEIGHT = 14f
-    private const val MARGIN_X = 14f
-    private const val MARGIN_TOP = 22f
-    private const val MARGIN_BOTTOM = 22f
-    private const val MIN_PAGE_W = 220
+    private const val PAGE_W = 430
+    private const val PAD_X = 26f
+    private const val MARGIN_Y = 28f
+    private const val DASH_H = 16f
+    private const val LINE_FACTOR = 1.5f
 }
