@@ -1,9 +1,7 @@
 package com.nexapos.retail.data.barcode
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BarcodeAssemblerTest {
@@ -12,20 +10,29 @@ class BarcodeAssemblerTest {
     @Test
     fun `fast burst then terminator emits the code`() {
         val a = assembler()
-        assertFalse(a.feed('5', 1000)) // first char never swallowed
-        assertTrue(a.feed('9', 1005)) // machine-fast → swallowed
-        assertTrue(a.feed('0', 1010))
-        assertTrue(a.feed('1', 1015))
+        a.feed('5', 1000)
+        a.feed('9', 1005)
+        a.feed('0', 1010)
+        a.feed('1', 1015)
         assertEquals("5901", a.finish(1020))
     }
 
     @Test
-    fun `slow human typing then enter is not a scan and is never swallowed`() {
+    fun `slow human typing then enter is not a scan`() {
         val a = assembler()
-        assertFalse(a.feed('1', 1000))
-        assertFalse(a.feed('2', 1200)) // 200ms gap → buffer reset, not swallowed
-        assertFalse(a.feed('3', 1400))
+        a.feed('1', 1000)
+        a.feed('2', 1200) // 200ms gap → buffer reset
+        a.feed('3', 1400)
         assertNull(a.finish(1600))
+    }
+
+    @Test
+    fun `moderately fast typing stays below the scan threshold`() {
+        val a = assembler()
+        a.feed('a', 1000)
+        a.feed('b', 1060) // 60ms > 50ms reset → never accumulates
+        a.feed('c', 1120)
+        assertNull(a.finish(1170))
     }
 
     @Test

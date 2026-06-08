@@ -38,8 +38,11 @@ class ScannerBridge(
                         false
                     }
                 } else {
+                    // Never swallow a character — buffer it for detection but always let it
+                    // reach the focused field so normal typing / key-repeat is never eaten.
                     val ch = event.unicodeChar
-                    if (ch == 0) false else assembler.feed(ch.toChar(), event.eventTime)
+                    if (ch != 0) assembler.feed(ch.toChar(), event.eventTime)
+                    false
                 }
             else -> false
         }

@@ -4,19 +4,17 @@ package com.nexapos.retail.data.barcode
  * Pure assembler that turns a stream of typed characters + a terminator into a
  * barcode, distinguishing a hardware scanner's fast burst from human typing.
  *
- * - [feed] appends a character. A gap longer than [resetGapMs] since the previous
- *   character resets the buffer, so slow human typing never accumulates into a
- *   "scan". It returns true when the character should be SWALLOWED (hidden from a
- *   focused field) — only for machine-fast chars (gap <= [swallowGapMs]) after the
- *   first — so normal typing is never eaten.
- * - [finish] is called on a terminator key; it returns the code iff the buffer was
- *   built as a fast burst of at least [minLen] characters, then resets.
+ * It NEVER swallows characters — every keystroke still reaches the focused field,
+ * so normal typing and key auto-repeat are never broken. Detection is purely
+ * retrospective: [feed] buffers characters, resetting the buffer whenever the gap
+ * since the previous character exceeds [resetGapMs] (so human-speed typing never
+ * accumulates); [finish], called on a terminator key, returns the code only if the
+ * buffer was built as one fast burst of at least [minLen] characters.
  *
  * No Android types → fully unit-testable.
  */
 class BarcodeAssembler(
     private val resetGapMs: Long = RESET_GAP_MS,
-    private val swallowGapMs: Long = SWALLOW_GAP_MS,
     private val minLen: Int = MIN_LEN,
 ) {
     private val buffer = StringBuilder()
@@ -25,12 +23,10 @@ class BarcodeAssembler(
     fun feed(
         ch: Char,
         atMs: Long,
-    ): Boolean {
-        val gap = atMs - lastMs
-        if (gap > resetGapMs) buffer.setLength(0)
+    ) {
+        if (atMs - lastMs > resetGapMs) buffer.setLength(0)
         buffer.append(ch)
         lastMs = atMs
-        return buffer.length > 1 && gap in 0..swallowGapMs
     }
 
     fun finish(atMs: Long): String? {
@@ -42,8 +38,11 @@ class BarcodeAssembler(
     }
 
     companion object {
-        const val RESET_GAP_MS = 100L
-        const val SWALLOW_GAP_MS = 40L
+        // A scanner emits a whole barcode with only a few ms between keystrokes; a
+        // human types far slower. 50ms cleanly separates the two: human keystrokes
+        // exceed it (so the buffer resets every key and never forms a "scan"),
+        // while a scanner's keystrokes fall under it and accumulate.
+        const val RESET_GAP_MS = 50L
         const val MIN_LEN = 3
     }
 }
