@@ -236,12 +236,19 @@ class ReportsViewModel(
 
     /** Computes per-product activity once items are loaded. */
     fun productActivity(): List<ProductActivity> {
-        val costByProductId = products.associate { it.id to it.costCents }
-        val sold = mutableMapOf<Long, Pair<Int, Long>>() // productId → (qty, revenueCents)
-        saleItemsBySaleId.values.flatten().forEach { item ->
-            val pid = item.productId ?: return@forEach
-            val cur = sold[pid] ?: (0 to 0L)
-            sold[pid] = (cur.first + item.quantity) to (cur.second + item.lineTotalCents)
+        val discountBySaleId = sales.associate { it.id to it.discountCents }
+        val qtySoldByProduct = mutableMapOf<Long, Int>()
+        val revenueByProduct = mutableMapOf<Long, Long>()
+        // Revenue is netted per sale: each line drops its own discount, then the sale's
+        // cart-level discount is allocated proportionally across that sale's lines.
+        saleItemsBySaleId.forEach { (saleId, items) ->
+            items.forEach { item ->
+                val pid = item.productId ?: return@forEach
+                qtySoldByProduct[pid] = (qtySoldByProduct[pid] ?: 0) + item.quantity
+            }
+            netRevenueByProduct(items, discountBySaleId[saleId] ?: 0L).forEach { (pid, rev) ->
+                revenueByProduct[pid] = (revenueByProduct[pid] ?: 0L) + rev
+            }
         }
         val purchased = mutableMapOf<Long, Pair<Int, Long>>()
         purchaseItemsByPurchaseId.values.flatten().forEach { item ->
@@ -250,14 +257,13 @@ class ReportsViewModel(
             purchased[pid] = (cur.first + item.quantity) to (cur.second + item.lineTotalCents)
         }
         return products.map { p ->
-            val s = sold[p.id] ?: (0 to 0L)
             val q = purchased[p.id] ?: (0 to 0L)
             ProductActivity(
                 productId = p.id,
                 name = p.name,
                 sku = p.sku,
-                qtySold = s.first,
-                revenueRupees = (s.second / CENTS_PER_RUPEE).toInt(),
+                qtySold = qtySoldByProduct[p.id] ?: 0,
+                revenueRupees = ((revenueByProduct[p.id] ?: 0L) / CENTS_PER_RUPEE).toInt(),
                 qtyPurchased = q.first,
                 purchaseCostRupees = (q.second / CENTS_PER_RUPEE).toInt(),
             )
