@@ -244,6 +244,9 @@ class SellingViewModel(
         val line = workingLines[i]
         val flat = if (isPercent) percentToFlat(line.lineTotal, value) else value.coerceAtLeast(0)
         workingLines[i] = line.copy(discount = flat.coerceIn(0, line.lineTotal))
+        // A cart % is stored as a flat Rs against afterItems at apply time; recompute it so
+        // editing an item discount keeps "X% off the cart" honest as the base changes.
+        if (discountIsPercent) discount = percentToFlat(afterItems, discountPercent)
         if (!isCredit) received = total
     }
 
@@ -497,7 +500,9 @@ class SellingViewModel(
                 createdAt = snapshot.createdAt,
                 subtotalCents = snapshot.subtotal * CENTS_PER_RUPEE,
                 taxCents = snapshot.vat * CENTS_PER_RUPEE,
-                discountCents = snapshot.discount * CENTS_PER_RUPEE,
+                // Persist the TOTAL discount (cart + per-line) so subtotal − discount reconciles
+                // with the total and matches the printed receipt; per-line amounts also live on SaleItem.
+                discountCents = (snapshot.discount + snapshot.lines.sumOf { it.discount }) * CENTS_PER_RUPEE,
                 totalCents = snapshot.total * CENTS_PER_RUPEE,
                 paymentMethod = snapshot.pay.uppercase(),
                 amountTenderedCents = snapshot.received * CENTS_PER_RUPEE,

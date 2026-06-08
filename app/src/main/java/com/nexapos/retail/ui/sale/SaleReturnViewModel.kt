@@ -88,7 +88,18 @@ class SaleReturnViewModel(
                     ReturnLine(
                         productId = item.productId,
                         name = item.nameSnapshot,
-                        unitPriceRupees = (item.unitPriceCents / CENTS_PER_RUPEE).toInt(),
+                        unitPriceRupees =
+                            run {
+                                // Refund the NET unit price (after the line's discount), not the gross,
+                                // so a discounted line is never over-refunded.
+                                val netUnitCents =
+                                    if (item.quantity > 0) {
+                                        (item.lineTotalCents - item.discountCents) / item.quantity
+                                    } else {
+                                        item.unitPriceCents
+                                    }
+                                (netUnitCents / CENTS_PER_RUPEE).toInt()
+                            },
                         maxReturnable = (item.quantity - already).coerceAtLeast(0),
                     )
                 }
