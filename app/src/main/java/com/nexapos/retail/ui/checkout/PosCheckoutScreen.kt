@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -185,11 +185,32 @@ private fun BillCard(
                 }
             }
             // charges
+            var showDiscount by remember { mutableStateOf(false) }
+            if (showDiscount) DiscountDialog(vm) { showDiscount = false }
             Column(
                 Modifier.fillMaxWidth().background(c.raised2).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                DiscountField(vm, Modifier.fillMaxWidth())
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(c.raised)
+                        .border(1.dp, c.hairline, RoundedCornerShape(10.dp))
+                        .clickable { showDiscount = true }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Discount", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                    Text(
+                        if (vm.totalDiscount > 0) "− " + rs(vm.totalDiscount) else "Add discount",
+                        fontFamily = JetBrainsMono,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (vm.totalDiscount > 0) c.ink else c.amber,
+                    )
+                }
                 NumField(
                     label = "Shipping",
                     value = vm.shipping,
@@ -204,7 +225,7 @@ private fun BillCard(
         Divider()
         Column(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 18.dp, vertical = 16.dp)) {
             BreakdownRow("Subtotal", rs(vm.subtotal))
-            BreakdownRow("Discount", "− ${rs(vm.discount)}")
+            BreakdownRow("Discount", "− ${rs(vm.totalDiscount)}")
             if (vatRegistered) BreakdownRow("VAT (15% incl.)", rs(vm.vat))
             if (vm.shipping > 0) BreakdownRow("Shipping", "+ ${rs(vm.shipping)}")
             Spacer(Modifier.height(10.dp))
@@ -555,56 +576,157 @@ private fun NumField(
 }
 
 @Composable
-private fun DiscountField(
+private fun DiscountDialog(
     vm: SellingViewModel,
+    onDismiss: () -> Unit,
+) {
+    // Snapshot for Cancel/revert.
+    val snapCart = remember { vm.discount }
+    val snapIsPct = remember { vm.discountIsPercent }
+    val snapPct = remember { vm.discountPercent }
+    val snapLines = remember { vm.workingLines.associate { it.product.id to it.discount } }
+    var tab by remember { mutableStateOf(0) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { vm.clearAllDiscounts() }) { Text("Clear") }
+                TextButton(onClick = {
+                    vm.restoreDiscounts(snapCart, snapIsPct, snapPct, snapLines)
+                    onDismiss()
+                }) { Text("Cancel") }
+            }
+        },
+        title = { Text("Discount") },
+        text = {
+            Column(Modifier.widthIn(min = 360.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TabChip("Cart discount", tab == 0, Modifier.weight(1f)) { tab = 0 }
+                    TabChip("Item discount", tab == 1, Modifier.weight(1f)) { tab = 1 }
+                }
+                Spacer(Modifier.height(12.dp))
+                if (tab == 0) CartDiscountTab(vm) else ItemDiscountTab(vm)
+            }
+        },
+    )
+}
+
+@Composable
+private fun TabChip(
+    label: String,
+    selected: Boolean,
     modifier: Modifier,
+    onClick: () -> Unit,
 ) {
     val c = PosTheme.colors
+    Box(
+        modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) c.ink else c.raised)
+            .border(1.dp, c.hairline, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
+    }
+}
+
+@Composable
+private fun CartDiscountTab(vm: SellingViewModel) {
+    val c = PosTheme.colors
     val isPct = vm.discountIsPercent
-    Column(modifier) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Discount", fontSize = 11.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.SemiBold, color = c.muted)
-            Row(Modifier.clip(RoundedCornerShape(8.dp)).border(1.dp, c.hairline, RoundedCornerShape(8.dp))) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Apply cart discount", fontSize = 12.sp, color = c.muted)
+            Row(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, c.hairline, RoundedCornerShape(7.dp))) {
                 ModeChip("%", isPct) { vm.applyDiscount(isPercent = true, value = vm.discountPercent) }
                 ModeChip("Rs", !isPct) { vm.applyDiscount(isPercent = false, value = vm.discount) }
             }
         }
-        Spacer(Modifier.height(6.dp))
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(42.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(c.raised)
-                .border(1.dp, c.hairline, RoundedCornerShape(10.dp))
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (!isPct) Text("Rs", fontSize = 13.sp, color = c.muted)
-            val shown = if (isPct) vm.discountPercent else vm.discount
-            BasicTextField(
-                value = if (shown == 0) "" else shown.toString(),
-                onValueChange = { vm.applyDiscount(isPercent = isPct, value = it.toIntOrNull() ?: 0) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                cursorBrush = SolidColor(c.amber),
-            )
-            if (isPct) Text("%", fontSize = 13.sp, color = c.muted)
+        DiscountInputRow(isPct = isPct, value = if (isPct) vm.discountPercent else vm.discount) { v ->
+            vm.applyDiscount(isPercent = isPct, value = v)
         }
-        Spacer(Modifier.height(6.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(5, 10, 15).forEach { p ->
-                PresetChip("$p%") { vm.applyDiscount(isPercent = true, value = p) }
+        Divider()
+        SummaryRow("Subtotal", rs(vm.subtotal))
+        SummaryRow("Total discount", "− " + rs(vm.totalDiscount))
+        SummaryRow("Total", rs(vm.total), bold = true)
+    }
+}
+
+@Composable
+private fun ItemDiscountTab(vm: SellingViewModel) {
+    val c = PosTheme.colors
+    Column(
+        Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        vm.workingLines.forEach { line ->
+            var pct by remember(line.product.id) { mutableStateOf(false) }
+            var pctInput by remember(line.product.id) { mutableStateOf(0) }
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.raised)
+                    .border(1.dp, c.hairline, RoundedCornerShape(10.dp)).padding(10.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(line.product.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(rs(line.lineTotal), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.muted)
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, c.hairline, RoundedCornerShape(7.dp))) {
+                        ModeChip("%", pct) { pct = true }
+                        ModeChip("Rs", !pct) { pct = false }
+                    }
+                    DiscountInputRow(isPct = pct, value = if (pct) pctInput else line.discount, modifier = Modifier.weight(1f)) { v ->
+                        if (pct) pctInput = v
+                        vm.applyItemDiscount(line.product.id, isPercent = pct, value = v)
+                    }
+                }
             }
-            PresetChip("Clear") { vm.applyDiscount(isPercent = false, value = 0) }
         }
+    }
+}
+
+@Composable
+private fun DiscountInputRow(
+    isPct: Boolean,
+    value: Int,
+    modifier: Modifier = Modifier,
+    onChange: (Int) -> Unit,
+) {
+    val c = PosTheme.colors
+    Row(
+        modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(10.dp)).background(c.raised)
+            .border(1.dp, c.hairline, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (!isPct) Text("Rs", fontSize = 13.sp, color = c.muted)
+        BasicTextField(
+            value = if (value == 0) "" else value.toString(),
+            onValueChange = { onChange(it.toIntOrNull() ?: 0) },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+            textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            cursorBrush = SolidColor(c.amber),
+        )
+        if (isPct) Text("%", fontSize = 13.sp, color = c.muted)
+    }
+}
+
+@Composable
+private fun SummaryRow(
+    label: String,
+    value: String,
+    bold: Boolean = false,
+) {
+    val c = PosTheme.colors
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 13.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal, color = if (bold) c.ink else c.muted)
+        Text(value, fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.SemiBold, color = c.ink)
     }
 }
 
@@ -617,32 +739,12 @@ private fun ModeChip(
     val c = PosTheme.colors
     Box(
         Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(7.dp))
             .background(if (selected) c.ink else Color.Transparent)
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = 9.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
-    }
-}
-
-@Composable
-private fun RowScope.PresetChip(
-    label: String,
-    onClick: () -> Unit,
-) {
-    val c = PosTheme.colors
-    Box(
-        Modifier
-            .weight(1f)
-            .height(30.dp)
-            .clip(CircleShape)
-            .background(c.raised)
-            .border(1.dp, c.hairline, CircleShape)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1)
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
     }
 }
