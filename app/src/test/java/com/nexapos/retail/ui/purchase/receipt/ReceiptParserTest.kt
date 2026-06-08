@@ -28,6 +28,81 @@ class ReceiptParserTest {
     }
 
     @Test
+    fun `parses a multi-column VAT invoice by column position`() {
+        // Real ML Kit fragments (left, top, right, bottom) from a Hardwares Point Ltd invoice.
+        fun f(
+            text: String,
+            left: Int,
+            top: Int,
+            right: Int,
+            bottom: Int,
+        ) =
+            OcrLine(text, top = top, bottom = bottom, left = left, right = right)
+        val ocr =
+            listOf(
+                f("CASHCHEQUE NO", 19, -2, 148, 24),
+                f("Hardwares Point Ltd", 57, 144, 281, 171),
+                f("Code", 63, 447, 98, 458),
+                f("Description", 286, 457, 360, 471),
+                f("Quantity", 486, 458, 538, 473),
+                f("Unit Price", 586, 461, 644, 471),
+                f("VAT", 692, 460, 716, 470),
+                f("Total", 779, 459, 810, 469),
+                f("GUTP4-0080", 16, 465, 115, 484),
+                f("UPVC GUTTER 8OMM WHITE UV", 192, 477, 401, 495),
+                f("5", 534, 486, 540, 495),
+                f("325.00", 610, 486, 651, 496),
+                f("211.96", 701, 483, 741, 496),
+                f("1,625.00", 788, 482, 837, 495),
+                f("NP6-0050", 20, 487, 92, 502),
+                f("UPVC NP PIPE 50MM X 6 MTS", 192, 496, 385, 511),
+                f("10", 528, 504, 539, 513),
+                f("210.00", 610, 504, 652, 513),
+                f("273.91", 702, 502, 742, 513),
+                f("2,100.00", 784, 500, 836, 512),
+                f("NP6-0075", 19, 505, 90, 520),
+                f("UPVC NP PIPE 75MM X 6MTS", 191, 512, 385, 531),
+                f("7", 534, 521, 541, 531),
+                f("360.00", 611, 521, 652, 531),
+                f("328.70", 701, 520, 743, 531),
+                f("2,520.00", 787, 519, 837, 529),
+                f("NP6-0110", 18, 523, 89, 539),
+                f("UPVC NP PIPE 11MM X 6MTS", 190, 530, 387, 548),
+                f("5", 535, 539, 541, 548),
+                f("550.00", 611, 539, 652, 549),
+                f("358.70", 702, 538, 744, 549),
+                f("2,750.00", 787, 536, 837, 547),
+                f("PP6-0063-16", 17, 542, 110, 558),
+                f("P PIPE 63MM X 6MTS PN16", 192, 547, 367, 565),
+                f("3", 534, 556, 541, 566),
+                f("1,050.00", 600, 554, 652, 568),
+                f("410 87", 701, 553, 742, 566),
+                f("3,150.00", 789, 552, 844, 585),
+                f("PP6-0050-16", 16, 560, 110, 577),
+                f("P. PIPE 50MM X 6MTS PN16", 193, 566, 367, 582),
+                f("5", 535, 574, 542, 584),
+                f("625.00", 612, 574, 651, 584),
+                f("407.61", 704, 573, 744, 584),
+                f("3,125.00", 787, 573, 797, 584),
+                f("Subtotal:", 617, 1049, 686, 1063),
+                f("Rs 13,278.25", 784, 1044, 877, 1064),
+            )
+        val parsed = ReceiptParser.parse(ocr)
+        assertEquals("Hardwares Point Ltd", parsed.supplierGuess)
+        assertEquals(
+            listOf(
+                ReceiptDraftLine("UPVC GUTTER 8OMM WHITE UV", 5, 325),
+                ReceiptDraftLine("UPVC NP PIPE 50MM X 6 MTS", 10, 210),
+                ReceiptDraftLine("UPVC NP PIPE 75MM X 6MTS", 7, 360),
+                ReceiptDraftLine("UPVC NP PIPE 11MM X 6MTS", 5, 550),
+                ReceiptDraftLine("P PIPE 63MM X 6MTS PN16", 3, 1050),
+                ReceiptDraftLine("P. PIPE 50MM X 6MTS PN16", 5, 625),
+            ),
+            parsed.lines,
+        )
+    }
+
+    @Test
     fun `extracts qty name and unit cost from a printed line`() {
         val parsed = ReceiptParser.parse(lines("2 Hammer Claw 16oz   250.00"))
         assertEquals(1, parsed.lines.size)
