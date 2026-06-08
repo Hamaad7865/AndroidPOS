@@ -124,6 +124,8 @@ class SellingViewModel(
     var shipping by mutableStateOf(0)
     var pay by mutableStateOf("cash")
     var received by mutableStateOf(0)
+    var discountIsPercent by mutableStateOf(false)
+    var discountPercent by mutableStateOf(0)
 
     var lastSale by mutableStateOf<SaleSnapshot?>(null)
         private set
@@ -196,8 +198,29 @@ class SellingViewModel(
         workingLines.clear()
         selectedCustomer = null
         discount = 0
+        discountIsPercent = false
+        discountPercent = 0
         shipping = 0
         received = 0
+    }
+
+    /**
+     * Sets the discount from either a percentage of the subtotal or a flat Rs amount.
+     * Stores the resulting flat [discount] (the source of truth for the total) and keeps
+     * the cash tender in sync, mirroring direct edits to the field.
+     */
+    fun applyDiscount(
+        isPercent: Boolean,
+        value: Int,
+    ) {
+        discountIsPercent = isPercent
+        if (isPercent) {
+            discountPercent = value.coerceIn(0, 100)
+            discount = percentToFlat(subtotal, discountPercent)
+        } else {
+            discount = value.coerceAtLeast(0)
+        }
+        if (!isCredit) received = total
     }
 
     // --- Cart ------------------------------------------------------------
