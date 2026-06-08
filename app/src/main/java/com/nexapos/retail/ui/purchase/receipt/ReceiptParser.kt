@@ -19,12 +19,12 @@ object ReceiptParser {
         if (lines.isEmpty()) {
             return ParsedReceipt("", emptyList(), listOf("Nothing was read from the image."))
         }
-        val ordered = lines.sortedBy { it.top }
-        val supplier = ordered.firstOrNull { !looksLikeAmountOrNoise(it.text) }?.text?.trim().orEmpty()
+        val rows = mergeRows(lines)
+        val supplier = rows.firstOrNull { !looksLikeAmountOrNoise(it.text) }?.text?.trim().orEmpty()
 
         val items = mutableListOf<ReceiptDraftLine>()
         var skipped = 0
-        for (line in ordered) {
+        for (line in rows) {
             val raw = line.text.trim()
             if (raw.isBlank()) continue
             if (NON_ITEM.containsMatchIn(raw)) continue
@@ -53,6 +53,36 @@ object ReceiptParser {
                 if (skipped > 0) add("$skipped line(s) couldn't be read clearly — please check.")
             }
         return ParsedReceipt(supplierGuess = supplier, lines = items, warnings = warnings)
+    }
+
+    /**
+     * ML Kit returns an item's name and its price as separate fragments on wide
+     * receipts (left column vs right column). Regroup fragments sharing a vertical
+     * band into one logical line, ordered left-to-right, so the price rejoins its
+     * name before parsing.
+     */
+    private fun mergeRows(lines: List<OcrLine>): List<OcrLine> {
+        val sorted = lines.sortedWith(compareBy({ it.top }, { it.left }))
+        val rows = mutableListOf<MutableList<OcrLine>>()
+        for (line in sorted) {
+            val band = rows.lastOrNull()
+            val centre = (line.top + line.bottom) / 2
+            if (band != null && centre >= band.minOf { it.top } && centre <= band.maxOf { it.bottom }) {
+                band.add(line)
+            } else {
+                rows.add(mutableListOf(line))
+            }
+        }
+        return rows.map { row ->
+            val ordered = row.sortedBy { it.left }
+            OcrLine(
+                text = ordered.joinToString(" ") { it.text.trim() },
+                top = row.minOf { it.top },
+                bottom = row.maxOf { it.bottom },
+                left = ordered.first().left,
+                right = ordered.maxOf { it.right },
+            )
+        }
     }
 
     private fun looksLikeAmountOrNoise(text: String): Boolean {

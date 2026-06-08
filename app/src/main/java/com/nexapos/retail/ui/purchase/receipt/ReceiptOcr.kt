@@ -29,6 +29,7 @@ object ReceiptOcr {
                 OcrLine(
                     text = line.text,
                     top = box?.top ?: 0,
+                    bottom = box?.bottom ?: 0,
                     left = box?.left ?: 0,
                     right = box?.right ?: 0,
                 )

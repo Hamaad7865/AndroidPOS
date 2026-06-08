@@ -7,6 +7,7 @@ package com.nexapos.retail.ui.purchase.receipt
 data class OcrLine(
     val text: String,
     val top: Int,
+    val bottom: Int,
     val left: Int,
     val right: Int,
 )

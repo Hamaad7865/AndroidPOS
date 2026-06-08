@@ -6,7 +6,26 @@ import org.junit.Test
 
 class ReceiptParserTest {
     private fun lines(vararg text: String): List<OcrLine> =
-        text.mapIndexed { i, t -> OcrLine(t, top = i * 30, left = 0, right = 400) }
+        text.mapIndexed { i, t -> OcrLine(t, top = i * 30, bottom = i * 30 + 22, left = 0, right = 400) }
+
+    @Test
+    fun `merges name and price that OCR split into separate columns`() {
+        val ocr =
+            listOf(
+                OcrLine("2 Hammer Claw 16oz", top = 100, bottom = 124, left = 0, right = 220),
+                OcrLine("250.00", top = 102, bottom = 126, left = 480, right = 560),
+                OcrLine("Cement Bag 50kg", top = 150, bottom = 174, left = 0, right = 200),
+                OcrLine("520.00", top = 151, bottom = 175, left = 480, right = 560),
+            )
+        val parsed = ReceiptParser.parse(ocr)
+        assertEquals(
+            listOf(
+                ReceiptDraftLine("Hammer Claw 16oz", 2, 250),
+                ReceiptDraftLine("Cement Bag 50kg", 1, 520),
+            ),
+            parsed.lines,
+        )
+    }
 
     @Test
     fun `extracts qty name and unit cost from a printed line`() {
