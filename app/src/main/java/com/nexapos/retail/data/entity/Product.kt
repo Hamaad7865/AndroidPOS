@@ -1,5 +1,6 @@
 package com.nexapos.retail.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -41,7 +42,11 @@ data class Product(
     val taxRatePercent: Double = 0.0,
     /** True ⇒ priceCents already includes tax; false ⇒ tax is added at the till. */
     val taxInclusive: Boolean = true,
-    /** VAT classification id — see VatType. Default STANDARD = 15% inclusive. */
+    /** VAT classification id — see VatType. Default STANDARD = 15% inclusive.
+     *  The SQL column default must be declared so Room's expected schema matches the
+     *  v6→v7 migration (which adds the column with DEFAULT 'STANDARD'); otherwise the
+     *  schema validation fails and the DB is destructively rebuilt, losing data. */
+    @ColumnInfo(defaultValue = "STANDARD")
     val vatType: String = "STANDARD",
     val stockQty: Int = 0,
     /** When stockQty falls to or below this, the product shows up as low-stock. */
