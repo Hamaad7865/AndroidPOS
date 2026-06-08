@@ -312,6 +312,9 @@ fun PosApp() {
         composable("printing-settings") {
             PrintingSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
         }
+        composable("scanner-settings") {
+            com.nexapos.retail.ui.settings.ScannerSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
+        }
         composable("setup") {
             BusinessSetupScreen(onDone = finishSetup, onBack = { navController.popBackStack() })
         }
