@@ -9,10 +9,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /** In-memory [SalesRepository] for unit tests, with an optional forced failure. */
 class FakeSalesRepository(
     var failOnRecord: Boolean = false,
+    seeded: List<Pair<Sale, List<SaleItem>>> = emptyList(),
 ) : SalesRepository {
-    val recorded = mutableListOf<Pair<Sale, List<SaleItem>>>()
+    val recorded = seeded.toMutableList()
 
-    override fun observeRecent(): Flow<List<Sale>> = MutableStateFlow(emptyList())
+    override fun observeRecent(): Flow<List<Sale>> = MutableStateFlow(recorded.map { it.first })
 
     override fun observeTotalSince(since: Long): Flow<Long> = MutableStateFlow(0L)
 
@@ -23,7 +24,8 @@ class FakeSalesRepository(
     override suspend fun getSale(id: Long): Sale? = recorded.getOrNull((id - 1).toInt())?.first
 
     override suspend fun itemsForSale(saleId: Long): List<SaleItem> =
-        recorded.getOrNull((saleId - 1).toInt())?.second.orEmpty()
+        recorded.firstOrNull { it.first.id == saleId }?.second
+            ?: recorded.getOrNull((saleId - 1).toInt())?.second.orEmpty()
 
     override fun observeForCustomer(customerId: Long): Flow<List<Sale>> =
         MutableStateFlow(recorded.map { it.first }.filter { it.customerId == customerId })
