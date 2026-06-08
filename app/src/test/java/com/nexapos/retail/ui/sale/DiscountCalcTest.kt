@@ -24,4 +24,21 @@ class DiscountCalcTest {
     fun `negative percent clamps to zero`() {
         assertEquals(0, percentToFlat(1000, -5))
     }
+
+    @Test
+    fun `large subtotal does not overflow`() {
+        // 100_000_000 * 50% = 50_000_000 (would overflow if computed as Int*Int)
+        assertEquals(50_000_000, percentToFlat(100_000_000, 50))
+    }
+
+    @Test
+    fun `flat maps back to its percent`() {
+        assertEquals(10, flatToPercent(1000, 100))
+    }
+
+    @Test
+    fun `flat to percent rounds and clamps`() {
+        assertEquals(100, flatToPercent(1000, 5000)) // > 100 clamped
+        assertEquals(0, flatToPercent(0, 100)) // zero subtotal → 0
+    }
 }

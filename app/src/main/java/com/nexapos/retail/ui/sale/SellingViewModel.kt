@@ -219,6 +219,9 @@ class SellingViewModel(
             discount = percentToFlat(subtotal, discountPercent)
         } else {
             discount = value.coerceAtLeast(0)
+            // Keep the percent representation in sync so switching to % mode (or a later
+            // re-tap) never reads a stale percent and silently wipes the flat discount.
+            discountPercent = flatToPercent(subtotal, discount)
         }
         if (!isCredit) received = total
     }
@@ -358,6 +361,8 @@ class SellingViewModel(
     /** Called when the cashier presses Charge; resets inputs and defaults tender to total. */
     fun beginCheckout() {
         discount = 0
+        discountIsPercent = false
+        discountPercent = 0
         shipping = 0
         pay = "cash"
         received = total
