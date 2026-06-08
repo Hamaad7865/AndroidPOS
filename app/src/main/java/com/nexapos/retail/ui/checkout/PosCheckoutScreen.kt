@@ -233,10 +233,10 @@ private fun PayCard(
 ) {
     val c = PosTheme.colors
     MachinedCard(modifier) {
-        // Scrollable region (payment type, amount, keypad). The quick amounts +
-        // Complete button stay pinned at the bottom so they're always reachable.
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 10.dp)) {
+        // Payment type, amount and keypad fill the panel exactly (the keypad flexes to
+        // the available height), so the panel always fits a tablet without scrolling.
+        Column(Modifier.weight(1f).fillMaxWidth()) {
+            Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 8.dp)) {
                 Eyebrow("Payment type")
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -260,7 +260,7 @@ private fun PayCard(
                 }
             }
             Divider(c.hairline2)
-            Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     Eyebrow(if (vm.isCredit) "Paid now" else "Received")
                     Text(rs(vm.received), fontFamily = JetBrainsMono, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
@@ -288,14 +288,14 @@ private fun PayCard(
                 }
             }
             Divider(c.hairline2)
-            // keypad — fixed-height rows so it never collapses on short screens
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // keypad — flexes to fill the remaining panel height so the panel never scrolls
+            Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
                     listOf("1", "2", "3", "C"),
                     listOf("4", "5", "6", "<"),
                     listOf("7", "8", "9", "0"),
                 ).forEach { row ->
-                    Row(Modifier.height(54.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.weight(1f).fillMaxWidth().heightIn(min = 40.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { k ->
                             val danger = k == "C" || k == "<"
                             Box(
