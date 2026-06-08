@@ -107,6 +107,24 @@ fun PosSaleScreen(
     val vat = vm.vat
     val total = vm.total
 
+    // Hardware barcode scanner: add the scanned product to the ticket. Mirrors the
+    // camera Scan button; clears the search box if any burst chars leaked into it.
+    val scanContext = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.nexapos.retail.data.barcode.ScannerEvents.scans.collect { code ->
+            if (vm.addByBarcode(code)) {
+                query = ""
+            } else {
+                android.widget.Toast.makeText(
+                    scanContext,
+                    "No product matches $code — add it first or search by name.",
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
+                query = code
+            }
+        }
+    }
+
     NavShell(
         active = "pos",
         onNav = onNav,

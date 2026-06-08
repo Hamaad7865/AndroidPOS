@@ -599,6 +599,13 @@ fun AddProductScreen(
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var loaded by remember(productId) { mutableStateOf(productId == null) }
 
+    // Hardware barcode scanner fills the barcode field, even when it isn't focused.
+    LaunchedEffect(Unit) {
+        com.nexapos.retail.data.barcode.ScannerEvents.scans.collect { code ->
+            if (code.isNotBlank()) barcode = code
+        }
+    }
+
     // Load existing product when opened in edit mode.
     LaunchedEffect(productId) {
         if (productId != null) {

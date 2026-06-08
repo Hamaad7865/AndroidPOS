@@ -72,6 +72,7 @@ private fun groups() =
             "Receipt & hardware",
             listOf(
                 SettingItem(PosIcons.print, "Printing & receipt", "Paper size, footer, test print", "printing-settings"),
+                SettingItem(PosIcons.barcode, "Barcode scanner", "External USB / Bluetooth scanner", "scanner-settings"),
             ),
         ),
         SettingGroup(
