@@ -14,7 +14,6 @@ import com.nexapos.retail.domain.repository.PartiesRepository
 import com.nexapos.retail.domain.repository.SalesRepository
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /** Lightweight display model for a catalog product, derived from the Room entity. */
 data class PosProduct(
@@ -35,12 +34,20 @@ data class PosProduct(
     val lowStockThreshold: Int = 5,
     val taxRatePercent: Double = 0.0,
     val taxInclusive: Boolean = true,
+    val vatType: com.nexapos.retail.data.entity.VatType = com.nexapos.retail.data.entity.VatType.STANDARD,
     /** Relative file name of the product photo under the images dir, or null. */
     val imagePath: String? = null,
 )
 
-data class PosLine(val product: PosProduct, val qty: Int) {
+data class PosLine(
+    val product: PosProduct,
+    val qty: Int,
+    val discount: Int = 0,
+) {
     val lineTotal get() = product.price * qty
+
+    /** Line amount after its own discount (never negative). */
+    val net get() = (lineTotal - discount).coerceAtLeast(0)
 }
 
 /**
@@ -124,6 +131,8 @@ class SellingViewModel(
     var shipping by mutableStateOf(0)
     var pay by mutableStateOf("cash")
     var received by mutableStateOf(0)
+    var discountIsPercent by mutableStateOf(false)
+    var discountPercent by mutableStateOf(0)
 
     var lastSale by mutableStateOf<SaleSnapshot?>(null)
         private set
@@ -196,8 +205,77 @@ class SellingViewModel(
         workingLines.clear()
         selectedCustomer = null
         discount = 0
+        discountIsPercent = false
+        discountPercent = 0
         shipping = 0
         received = 0
+    }
+
+    /**
+     * Sets the discount from either a percentage of the subtotal or a flat Rs amount.
+     * Stores the resulting flat [discount] (the source of truth for the total) and keeps
+     * the cash tender in sync, mirroring direct edits to the field.
+     */
+    fun applyDiscount(
+        isPercent: Boolean,
+        value: Int,
+    ) {
+        discountIsPercent = isPercent
+        if (isPercent) {
+            discountPercent = value.coerceIn(0, 100)
+            discount = percentToFlat(afterItems, discountPercent)
+        } else {
+            discount = value.coerceAtLeast(0)
+            // Keep the percent representation in sync so switching to % mode (or a later
+            // re-tap) never reads a stale percent and silently wipes the flat discount.
+            discountPercent = flatToPercent(afterItems, discount)
+        }
+        if (!isCredit) received = total
+    }
+
+    /** Sets a line's discount from a percentage of its line total or a flat Rs amount, clamped to the line. */
+    fun applyItemDiscount(
+        productId: String,
+        isPercent: Boolean,
+        value: Int,
+    ) {
+        val i = workingLines.indexOfFirst { it.product.id == productId }
+        if (i < 0) return
+        val line = workingLines[i]
+        val flat = if (isPercent) percentToFlat(line.lineTotal, value) else value.coerceAtLeast(0)
+        workingLines[i] = line.copy(discount = flat.coerceIn(0, line.lineTotal))
+        // A cart % is stored as a flat Rs against afterItems at apply time; recompute it so
+        // editing an item discount keeps "X% off the cart" honest as the base changes.
+        if (discountIsPercent) discount = percentToFlat(afterItems, discountPercent)
+        if (!isCredit) received = total
+    }
+
+    /** Removes every discount — cart and per-line. */
+    fun clearAllDiscounts() {
+        discount = 0
+        discountIsPercent = false
+        discountPercent = 0
+        for (i in workingLines.indices) {
+            if (workingLines[i].discount != 0) workingLines[i] = workingLines[i].copy(discount = 0)
+        }
+        if (!isCredit) received = total
+    }
+
+    /** Restores a captured discount state (used by the dialog's Cancel). */
+    fun restoreDiscounts(
+        cartDiscount: Int,
+        cartIsPercent: Boolean,
+        cartPercent: Int,
+        lineDiscounts: Map<String, Int>,
+    ) {
+        discount = cartDiscount
+        discountIsPercent = cartIsPercent
+        discountPercent = cartPercent
+        for (i in workingLines.indices) {
+            val d = lineDiscounts[workingLines[i].product.id] ?: 0
+            if (workingLines[i].discount != d) workingLines[i] = workingLines[i].copy(discount = d)
+        }
+        if (!isCredit) received = total
     }
 
     // --- Cart ------------------------------------------------------------
@@ -286,23 +364,31 @@ class SellingViewModel(
 
     // --- Checkout --------------------------------------------------------
 
+    /** Synced from BusinessProfile by the POS screen; gates VAT globally (off for non-VAT clients). */
+    var vatRegistered: Boolean = true
+
     val subtotal get() = workingLines.sumOf { it.lineTotal }
 
-    /**
-     * VAT INCLUSIVE: prices on the shelf already include 15% VAT.
-     * The tax portion embedded in the subtotal is: subtotal - subtotal/1.15
-     * (informational only; it does NOT get added to the total again).
-     */
-    val vat get() = subtotal - (subtotal / (1.0 + VAT_RATE)).roundToInt()
+    /** Total of the per-line (item) discounts. */
+    val itemDiscountTotal get() = workingLines.sumOf { it.discount }
+
+    /** Subtotal after item discounts; the base the cart discount applies to. */
+    val afterItems get() = (subtotal - itemDiscountTotal).coerceAtLeast(0)
 
     /**
-     * Discount is clamped so it can never exceed the subtotal (prevents a free sale
-     * slipping through by a large manual discount entry).
+     * Cart discount is clamped so it can never exceed the after-item subtotal
+     * (prevents a free sale slipping through by a large manual discount entry).
      */
-    private val clampedDiscount get() = discount.coerceIn(0, subtotal)
+    private val clampedDiscount get() = discount.coerceIn(0, afterItems)
+
+    /** Item discounts + cart discount — shown as the single "Discount" figure. */
+    val totalDiscount get() = itemDiscountTotal + clampedDiscount
+
+    /** VAT embedded in the cart after all discounts, per product VAT type. */
+    val vat get() = discountedVat(workingLines, clampedDiscount, vatRegistered)
 
     /** Exact payable total — prices are VAT-inclusive, so VAT is NOT added again. */
-    val total get() = (subtotal - clampedDiscount + shipping).coerceAtLeast(0)
+    val total get() = (afterItems - clampedDiscount + shipping).coerceAtLeast(0)
 
     val change get() = received - total
 
@@ -336,6 +422,11 @@ class SellingViewModel(
     /** Called when the cashier presses Charge; resets inputs and defaults tender to total. */
     fun beginCheckout() {
         discount = 0
+        discountIsPercent = false
+        discountPercent = 0
+        for (i in workingLines.indices) {
+            if (workingLines[i].discount != 0) workingLines[i] = workingLines[i].copy(discount = 0)
+        }
         shipping = 0
         pay = "cash"
         received = total
@@ -409,7 +500,9 @@ class SellingViewModel(
                 createdAt = snapshot.createdAt,
                 subtotalCents = snapshot.subtotal * CENTS_PER_RUPEE,
                 taxCents = snapshot.vat * CENTS_PER_RUPEE,
-                discountCents = snapshot.discount * CENTS_PER_RUPEE,
+                // Persist the TOTAL discount (cart + per-line) so subtotal − discount reconciles
+                // with the total and matches the printed receipt; per-line amounts also live on SaleItem.
+                discountCents = (snapshot.discount + snapshot.lines.sumOf { it.discount }) * CENTS_PER_RUPEE,
                 totalCents = snapshot.total * CENTS_PER_RUPEE,
                 paymentMethod = snapshot.pay.uppercase(),
                 amountTenderedCents = snapshot.received * CENTS_PER_RUPEE,
@@ -426,6 +519,7 @@ class SellingViewModel(
                     unitPriceCents = line.product.price * CENTS_PER_RUPEE,
                     quantity = line.qty,
                     lineTotalCents = line.lineTotal * CENTS_PER_RUPEE,
+                    discountCents = line.discount * CENTS_PER_RUPEE,
                 )
             }
         // Build the guarded stock-delta map (only for products with a known DB id).
@@ -459,7 +553,6 @@ class SellingViewModel(
 
     private companion object {
         const val CENTS_PER_RUPEE = 100L
-        const val VAT_RATE = 0.15
 
         /** Sequence offset: the first real sale becomes S-00011 on a fresh install. */
         const val STARTING_INVOICE = 9

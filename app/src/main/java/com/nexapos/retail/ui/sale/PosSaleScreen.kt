@@ -107,6 +107,13 @@ fun PosSaleScreen(
     val vat = vm.vat
     val total = vm.total
 
+    // Keep the till's VAT gate in sync with the business's VAT-registration setting.
+    val vatCtx = androidx.compose.ui.platform.LocalContext.current
+    val vatRegistered = com.nexapos.retail.data.profile.BusinessProfile.vatRegistered(vatCtx)
+    androidx.compose.runtime.LaunchedEffect(vatRegistered) {
+        vm.vatRegistered = vatRegistered
+    }
+
     // Hardware barcode scanner: add the scanned product to the ticket. Mirrors the
     // camera Scan button; clears the search box if any burst chars leaked into it.
     val scanContext = androidx.compose.ui.platform.LocalContext.current
@@ -266,8 +273,8 @@ fun PosSaleScreen(
                     Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
                     Column(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 18.dp, vertical = 14.dp)) {
                         TotalRow("Subtotal", rs(subtotal), false)
-                        TotalRow("Discount", "— Rs 0", true)
-                        TotalRow("VAT (15%, incl.)", rs(vat), true)
+                        TotalRow("Discount", if (vm.discount > 0) "— " + rs(vm.discount) else "Rs 0", true)
+                        if (vatRegistered) TotalRow("VAT (15%, incl.)", rs(vat), true)
                         Spacer(Modifier.height(10.dp))
                         Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
                         Spacer(Modifier.height(10.dp))

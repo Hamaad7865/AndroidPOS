@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -111,6 +112,7 @@ private fun BillCard(
     modifier: Modifier,
 ) {
     val c = PosTheme.colors
+    val vatRegistered = com.nexapos.retail.data.profile.BusinessProfile.vatRegistered(androidx.compose.ui.platform.LocalContext.current)
     var showPicker by remember { mutableStateOf(false) }
     if (showPicker) {
         CustomerPickerDialog(vm = vm, onDismiss = { showPicker = false })
@@ -183,20 +185,32 @@ private fun BillCard(
                 }
             }
             // charges
-            Row(
+            var showDiscount by remember { mutableStateOf(false) }
+            if (showDiscount) DiscountDialog(vm) { showDiscount = false }
+            Column(
                 Modifier.fillMaxWidth().background(c.raised2).padding(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                NumField(
-                    label = "Discount (flat Rs)",
-                    value = vm.discount,
-                    onChange = { v ->
-                        vm.discount = v
-                        // Keep tender in sync if the cashier hasn't switched to credit.
-                        if (!vm.isCredit) vm.received = vm.total
-                    },
-                    modifier = Modifier.weight(1f),
-                )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(c.raised)
+                        .border(1.dp, c.hairline, RoundedCornerShape(10.dp))
+                        .clickable { showDiscount = true }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Discount", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                    Text(
+                        if (vm.totalDiscount > 0) "− " + rs(vm.totalDiscount) else "Add discount",
+                        fontFamily = JetBrainsMono,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (vm.totalDiscount > 0) c.ink else c.amber,
+                    )
+                }
                 NumField(
                     label = "Shipping",
                     value = vm.shipping,
@@ -204,15 +218,15 @@ private fun BillCard(
                         vm.shipping = v
                         if (!vm.isCredit) vm.received = vm.total
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
         Divider()
         Column(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 18.dp, vertical = 16.dp)) {
             BreakdownRow("Subtotal", rs(vm.subtotal))
-            BreakdownRow("Discount", "− ${rs(vm.discount)}")
-            BreakdownRow("VAT (15% incl.)", rs(vm.vat))
+            BreakdownRow("Discount", "− ${rs(vm.totalDiscount)}")
+            if (vatRegistered) BreakdownRow("VAT (15% incl.)", rs(vm.vat))
             if (vm.shipping > 0) BreakdownRow("Shipping", "+ ${rs(vm.shipping)}")
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
@@ -558,5 +572,216 @@ private fun NumField(
                 cursorBrush = SolidColor(c.amber),
             )
         }
+    }
+}
+
+@Composable
+private fun DiscountDialog(
+    vm: SellingViewModel,
+    onDismiss: () -> Unit,
+) {
+    val c = PosTheme.colors
+    // Snapshot for Cancel/revert.
+    val snapCart = remember { vm.discount }
+    val snapIsPct = remember { vm.discountIsPercent }
+    val snapPct = remember { vm.discountPercent }
+    val snapLines = remember { vm.workingLines.associate { it.product.id to it.discount } }
+    var tab by remember { mutableStateOf(0) }
+    var selectedId by remember { mutableStateOf(vm.workingLines.firstOrNull()?.product?.id) }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .widthIn(max = 760.dp)
+                .fillMaxWidth(0.94f)
+                .clip(RoundedCornerShape(16.dp))
+                .background(c.surface)
+                .padding(20.dp),
+        ) {
+            Text("Discount options", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = c.ink)
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth().height(330.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Left: items on the ticket. Tappable (in Item mode) to pick which line to discount.
+                Column(
+                    Modifier.weight(0.42f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("Items", fontSize = 11.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.SemiBold, color = c.muted)
+                    vm.workingLines.forEach { line ->
+                        val sel = tab == 1 && line.product.id == selectedId
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .background(if (sel) c.amber.copy(alpha = 0.16f) else c.raised)
+                                .border(1.dp, if (sel) c.amber else c.hairline, RoundedCornerShape(10.dp))
+                                .clickable(enabled = tab == 1) { selectedId = line.product.id }
+                                .padding(10.dp),
+                        ) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(line.product.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Text(rs(line.lineTotal), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink)
+                            }
+                            Text("${line.qty} × ${rs(line.product.price)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                            if (line.discount > 0) {
+                                Text("− ${rs(line.discount)} disc", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber)
+                            }
+                        }
+                    }
+                }
+                Box(Modifier.width(1.dp).fillMaxHeight().background(c.hairline))
+                // Right: discount controls + running summary.
+                Column(Modifier.weight(0.58f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TabChip("Cart discount", tab == 0, Modifier.weight(1f)) { tab = 0 }
+                        TabChip("Item discount", tab == 1, Modifier.weight(1f)) { tab = 1 }
+                    }
+                    if (tab == 0) CartControls(vm) else ItemControls(vm, selectedId)
+                    Spacer(Modifier.weight(1f))
+                    Divider()
+                    SummaryRow("Subtotal", rs(vm.subtotal))
+                    SummaryRow("Total discount", "− " + rs(vm.totalDiscount))
+                    SummaryRow("Total", rs(vm.total), bold = true)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { vm.clearAllDiscounts() }) { Text("Clear") }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = {
+                    vm.restoreDiscounts(snapCart, snapIsPct, snapPct, snapLines)
+                    onDismiss()
+                }) { Text("Cancel") }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onDismiss) { Text("OK") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabChip(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) c.ink else c.raised)
+            .border(1.dp, c.hairline, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
+    }
+}
+
+@Composable
+private fun CartControls(vm: SellingViewModel) {
+    val c = PosTheme.colors
+    val isPct = vm.discountIsPercent
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Apply cart discount", fontSize = 12.sp, color = c.muted)
+            Row(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, c.hairline, RoundedCornerShape(7.dp))) {
+                ModeChip("%", isPct) { vm.applyDiscount(isPercent = true, value = vm.discountPercent) }
+                ModeChip("Rs", !isPct) { vm.applyDiscount(isPercent = false, value = vm.discount) }
+            }
+        }
+        DiscountInputRow(isPct = isPct, value = if (isPct) vm.discountPercent else vm.discount) { v ->
+            vm.applyDiscount(isPercent = isPct, value = v)
+        }
+    }
+}
+
+@Composable
+private fun ItemControls(
+    vm: SellingViewModel,
+    selectedId: String?,
+) {
+    val c = PosTheme.colors
+    val line = vm.workingLines.firstOrNull { it.product.id == selectedId }
+    if (line == null) {
+        Text("Add an item to the ticket to discount it.", fontSize = 12.sp, color = c.muted)
+        return
+    }
+    var pct by remember(selectedId) { mutableStateOf(false) }
+    var pctInput by remember(selectedId) { mutableStateOf(0) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(line.product.name, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Row(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, c.hairline, RoundedCornerShape(7.dp))) {
+                ModeChip("%", pct) { pct = true }
+                ModeChip("Rs", !pct) { pct = false }
+            }
+        }
+        DiscountInputRow(isPct = pct, value = if (pct) pctInput else line.discount) { v ->
+            if (pct) pctInput = v
+            vm.applyItemDiscount(line.product.id, isPercent = pct, value = v)
+        }
+    }
+}
+
+@Composable
+private fun DiscountInputRow(
+    isPct: Boolean,
+    value: Int,
+    modifier: Modifier = Modifier,
+    onChange: (Int) -> Unit,
+) {
+    val c = PosTheme.colors
+    Row(
+        modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(10.dp)).background(c.raised)
+            .border(1.dp, c.hairline, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (!isPct) Text("Rs", fontSize = 13.sp, color = c.muted)
+        BasicTextField(
+            value = if (value == 0) "" else value.toString(),
+            onValueChange = { onChange(it.toIntOrNull() ?: 0) },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+            textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            cursorBrush = SolidColor(c.amber),
+        )
+        if (isPct) Text("%", fontSize = 13.sp, color = c.muted)
+    }
+}
+
+@Composable
+private fun SummaryRow(
+    label: String,
+    value: String,
+    bold: Boolean = false,
+) {
+    val c = PosTheme.colors
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 13.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal, color = if (bold) c.ink else c.muted)
+        Text(value, fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.SemiBold, color = c.ink)
+    }
+}
+
+@Composable
+private fun ModeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (selected) c.ink else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
     }
 }
