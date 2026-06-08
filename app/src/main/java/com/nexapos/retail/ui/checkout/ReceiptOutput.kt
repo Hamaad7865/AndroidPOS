@@ -51,6 +51,7 @@ object ReceiptOutput {
         sale: SaleSnapshot,
     ): String {
         val biz = BusinessProfile.name(context)
+        val vatRegistered = BusinessProfile.vatRegistered(context)
         val sb = StringBuilder()
         sb.append("$biz — Receipt\n")
         sb.append("Invoice ${sale.invoiceNo} · ${dateFmt.format(Date(sale.createdAt))}\n")
@@ -61,7 +62,7 @@ object ReceiptOutput {
         }
         sb.append("\n")
         sb.append("Subtotal: ${money(sale.subtotal)}\n")
-        sb.append("VAT 15%: ${money(sale.vat)}\n")
+        if (vatRegistered) sb.append("VAT 15%: ${money(sale.vat)}\n")
         if (sale.discount > 0) sb.append("Discount: ${money(sale.discount)}\n")
         sb.append("TOTAL: ${money(sale.total)}\n")
         sb.append("Paid (${sale.pay}): ${money(sale.received)}\n")
@@ -256,7 +257,7 @@ object ReceiptOutput {
         }
         dash()
         row("Subtotal", p.label, money(sale.subtotal), p.valueR)
-        row("VAT 15% (incl.)", p.label, money(sale.vat), p.valueR)
+        if (BusinessProfile.vatRegistered(context)) row("VAT 15% (incl.)", p.label, money(sale.vat), p.valueR)
         if (sale.discount > 0) row("Discount", p.label, money(sale.discount), p.valueR)
         row("TOTAL", p.totalL, money(sale.total), p.totalR)
         row("Paid · ${sale.pay}", p.label, money(sale.received), p.valueR)
@@ -396,7 +397,7 @@ object ReceiptOutput {
               <hr>
               <table>
                 <tr><td class="k">Subtotal</td><td class="amt">${money(sale.subtotal)}</td></tr>
-                <tr><td class="k">VAT 15%</td><td class="amt">${money(sale.vat)}</td></tr>
+                ${if (BusinessProfile.vatRegistered(context)) "<tr><td class=\"k\">VAT 15%</td><td class=\"amt\">${money(sale.vat)}</td></tr>" else ""}
                 ${if (sale.discount > 0) "<tr><td class=\"k\">Discount</td><td class=\"amt\">${money(sale.discount)}</td></tr>" else ""}
                 <tr><td class="k b">TOTAL</td><td class="amt b">${money(sale.total)}</td></tr>
                 <tr><td class="k">Paid · ${esc(sale.pay)}</td><td class="amt">${money(sale.received)}</td></tr>

@@ -111,6 +111,7 @@ private fun BillCard(
     modifier: Modifier,
 ) {
     val c = PosTheme.colors
+    val vatRegistered = com.nexapos.retail.data.profile.BusinessProfile.vatRegistered(androidx.compose.ui.platform.LocalContext.current)
     var showPicker by remember { mutableStateOf(false) }
     if (showPicker) {
         CustomerPickerDialog(vm = vm, onDismiss = { showPicker = false })
@@ -212,7 +213,7 @@ private fun BillCard(
         Column(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 18.dp, vertical = 16.dp)) {
             BreakdownRow("Subtotal", rs(vm.subtotal))
             BreakdownRow("Discount", "− ${rs(vm.discount)}")
-            BreakdownRow("VAT (15% incl.)", rs(vm.vat))
+            if (vatRegistered) BreakdownRow("VAT (15% incl.)", rs(vm.vat))
             if (vm.shipping > 0) BreakdownRow("Shipping", "+ ${rs(vm.shipping)}")
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))

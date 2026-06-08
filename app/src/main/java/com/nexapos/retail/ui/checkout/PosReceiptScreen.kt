@@ -278,6 +278,7 @@ private fun ReceiptPaper(sale: SaleSnapshot) {
     val context = LocalContext.current
     val businessName = BusinessProfile.name(context)
     val receiptLines = BusinessProfile.receiptLines(context)
+    val vatRegistered = BusinessProfile.vatRegistered(context)
     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
     AnimatedVisibility(
         visibleState = visible,
@@ -313,8 +314,8 @@ private fun ReceiptPaper(sale: SaleSnapshot) {
                 Spacer(Modifier.height(4.dp))
             }
             DashedLine()
-            RcMoney("Subtotal (incl. VAT)", sale.subtotal)
-            RcMoney("VAT 15% (incl.)", sale.vat)
+            RcMoney(if (vatRegistered) "Subtotal (incl. VAT)" else "Subtotal", sale.subtotal)
+            if (vatRegistered) RcMoney("VAT 15% (incl.)", sale.vat)
             RcMoney("Discount", sale.discount)
             Box(Modifier.fillMaxWidth().height(1.dp).background(receiptInk).padding(vertical = 4.dp))
             RcMoney("TOTAL", sale.total, big = true)

@@ -107,6 +107,12 @@ fun PosSaleScreen(
     val vat = vm.vat
     val total = vm.total
 
+    // Keep the till's VAT gate in sync with the business's VAT-registration setting.
+    val vatCtx = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        vm.vatRegistered = com.nexapos.retail.data.profile.BusinessProfile.vatRegistered(vatCtx)
+    }
+
     // Hardware barcode scanner: add the scanned product to the ticket. Mirrors the
     // camera Scan button; clears the search box if any burst chars leaked into it.
     val scanContext = androidx.compose.ui.platform.LocalContext.current
