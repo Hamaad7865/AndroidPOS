@@ -311,12 +311,17 @@ private fun ReceiptPaper(sale: SaleSnapshot) {
                     Text("${l.qty} × ${formatNum(l.product.price.toDouble(), 0)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
                     Text(formatNum(l.lineTotal.toDouble(), 0), fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
                 }
+                if (l.discount > 0) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Text("− ${formatNum(l.discount.toDouble(), 0)} disc", fontFamily = JetBrainsMono, fontSize = 10.sp, color = receiptInk)
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
             }
             DashedLine()
             RcMoney(if (vatRegistered) "Subtotal (incl. VAT)" else "Subtotal", sale.subtotal)
             if (vatRegistered) RcMoney("VAT 15% (incl.)", sale.vat)
-            RcMoney("Discount", sale.discount)
+            RcMoney("Discount", sale.discount + sale.lines.sumOf { it.discount })
             Box(Modifier.fillMaxWidth().height(1.dp).background(receiptInk).padding(vertical = 4.dp))
             RcMoney("TOTAL", sale.total, big = true)
             RcMoney("Paid · ${sale.pay}", sale.received)

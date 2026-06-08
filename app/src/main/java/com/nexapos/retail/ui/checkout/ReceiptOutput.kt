@@ -59,11 +59,13 @@ object ReceiptOutput {
         sb.append("\n")
         sale.lines.forEach { l ->
             sb.append("${l.qty}× ${l.product.name} — ${money(l.lineTotal)}\n")
+            if (l.discount > 0) sb.append("   − ${money(l.discount)} disc\n")
         }
         sb.append("\n")
         sb.append("Subtotal: ${money(sale.subtotal)}\n")
         if (vatRegistered) sb.append("VAT 15%: ${money(sale.vat)}\n")
-        if (sale.discount > 0) sb.append("Discount: ${money(sale.discount)}\n")
+        val msgDisc = sale.discount + sale.lines.sumOf { it.discount }
+        if (msgDisc > 0) sb.append("Discount: ${money(msgDisc)}\n")
         sb.append("TOTAL: ${money(sale.total)}\n")
         sb.append("Paid (${sale.pay}): ${money(sale.received)}\n")
         if (sale.creditDue > 0) sb.append("Balance due: ${money(sale.creditDue)}\n")
@@ -254,11 +256,13 @@ object ReceiptOutput {
         sale.lines.forEach { l ->
             left(l.product.name, p.item)
             row("   ${l.qty} × ${formatNum(l.product.price.toDouble(), 0)}", p.qty, formatNum(l.lineTotal.toDouble(), 0), p.amtR)
+            if (l.discount > 0) row("   − discount", p.qty, "-" + formatNum(l.discount.toDouble(), 0), p.amtR)
         }
         dash()
         row("Subtotal", p.label, money(sale.subtotal), p.valueR)
         if (BusinessProfile.vatRegistered(context)) row("VAT 15% (incl.)", p.label, money(sale.vat), p.valueR)
-        if (sale.discount > 0) row("Discount", p.label, money(sale.discount), p.valueR)
+        val pdfDisc = sale.discount + sale.lines.sumOf { it.discount }
+        if (pdfDisc > 0) row("Discount", p.label, money(pdfDisc), p.valueR)
         row("TOTAL", p.totalL, money(sale.total), p.totalR)
         row("Paid · ${sale.pay}", p.label, money(sale.received), p.valueR)
         if (sale.creditDue > 0) {
@@ -350,12 +354,14 @@ object ReceiptOutput {
         val biz = esc(BusinessProfile.name(context))
         val headerLines = BusinessProfile.receiptLines(context).joinToString("") { "<div class=\"sub\">${esc(it)}</div>" }
         val footer = esc(ReceiptSettings.footerNote(context))
+        val htmlDisc = sale.discount + sale.lines.sumOf { it.discount }
         val itemRows =
             sale.lines.joinToString("") { l ->
                 """
                 <tr><td colspan="2" class="nm">${esc(l.product.name)}</td></tr>
                 <tr><td class="qty">${l.qty} × ${formatNum(l.product.price.toDouble(), 0)}</td>
                     <td class="amt">${formatNum(l.lineTotal.toDouble(), 0)}</td></tr>
+                ${if (l.discount > 0) "<tr><td class=\"qty\">− discount</td><td class=\"amt\">-${formatNum(l.discount.toDouble(), 0)}</td></tr>" else ""}
                 """.trimIndent()
             }
         val tailRow =
@@ -398,7 +404,7 @@ object ReceiptOutput {
               <table>
                 <tr><td class="k">Subtotal</td><td class="amt">${money(sale.subtotal)}</td></tr>
                 ${if (BusinessProfile.vatRegistered(context)) "<tr><td class=\"k\">VAT 15%</td><td class=\"amt\">${money(sale.vat)}</td></tr>" else ""}
-                ${if (sale.discount > 0) "<tr><td class=\"k\">Discount</td><td class=\"amt\">${money(sale.discount)}</td></tr>" else ""}
+                ${if (htmlDisc > 0) "<tr><td class=\"k\">Discount</td><td class=\"amt\">${money(htmlDisc)}</td></tr>" else ""}
                 <tr><td class="k b">TOTAL</td><td class="amt b">${money(sale.total)}</td></tr>
                 <tr><td class="k">Paid · ${esc(sale.pay)}</td><td class="amt">${money(sale.received)}</td></tr>
                 $tailRow
