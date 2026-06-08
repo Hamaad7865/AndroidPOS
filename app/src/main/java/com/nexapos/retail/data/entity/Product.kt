@@ -41,6 +41,8 @@ data class Product(
     val taxRatePercent: Double = 0.0,
     /** True ⇒ priceCents already includes tax; false ⇒ tax is added at the till. */
     val taxInclusive: Boolean = true,
+    /** VAT classification id — see VatType. Default STANDARD = 15% inclusive. */
+    val vatType: String = "STANDARD",
     val stockQty: Int = 0,
     /** When stockQty falls to or below this, the product shows up as low-stock. */
     val lowStockThreshold: Int = 5,

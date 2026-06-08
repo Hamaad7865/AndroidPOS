@@ -14,7 +14,6 @@ import com.nexapos.retail.domain.repository.PartiesRepository
 import com.nexapos.retail.domain.repository.SalesRepository
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /** Lightweight display model for a catalog product, derived from the Room entity. */
 data class PosProduct(
@@ -35,6 +34,7 @@ data class PosProduct(
     val lowStockThreshold: Int = 5,
     val taxRatePercent: Double = 0.0,
     val taxInclusive: Boolean = true,
+    val vatType: com.nexapos.retail.data.entity.VatType = com.nexapos.retail.data.entity.VatType.STANDARD,
     /** Relative file name of the product photo under the images dir, or null. */
     val imagePath: String? = null,
 )
@@ -286,14 +286,13 @@ class SellingViewModel(
 
     // --- Checkout --------------------------------------------------------
 
+    /** Synced from BusinessProfile by the POS screen; gates VAT globally (off for non-VAT clients). */
+    var vatRegistered: Boolean = true
+
     val subtotal get() = workingLines.sumOf { it.lineTotal }
 
-    /**
-     * VAT INCLUSIVE: prices on the shelf already include 15% VAT.
-     * The tax portion embedded in the subtotal is: subtotal - subtotal/1.15
-     * (informational only; it does NOT get added to the total again).
-     */
-    val vat get() = subtotal - (subtotal / (1.0 + VAT_RATE)).roundToInt()
+    /** VAT embedded in the cart — per product VAT type, gated on the business being VAT-registered. */
+    val vat get() = vatOf(workingLines, vatRegistered)
 
     /**
      * Discount is clamped so it can never exceed the subtotal (prevents a free sale
@@ -459,7 +458,6 @@ class SellingViewModel(
 
     private companion object {
         const val CENTS_PER_RUPEE = 100L
-        const val VAT_RATE = 0.15
 
         /** Sequence offset: the first real sale becomes S-00011 on a fresh install. */
         const val STARTING_INVOICE = 9

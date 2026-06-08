@@ -3,6 +3,7 @@ package com.nexapos.retail.ui.sale
 import com.nexapos.retail.data.entity.Brand
 import com.nexapos.retail.data.entity.Category
 import com.nexapos.retail.data.entity.Product
+import com.nexapos.retail.data.entity.VatType
 
 /** Filter label shown first in every category chip row. */
 const val ALL_CATEGORY = "All"
@@ -36,6 +37,7 @@ fun List<Product>.toPosProducts(
             lowStockThreshold = product.lowStockThreshold,
             taxRatePercent = product.taxRatePercent,
             taxInclusive = product.taxInclusive,
+            vatType = VatType.from(product.vatType),
             imagePath = product.imagePath,
         )
     }
