@@ -74,7 +74,8 @@ fun PosSaleScreen(
     onNav: (String) -> Unit,
 ) {
     val c = PosTheme.colors
-    var cat by remember { mutableStateOf("All") }
+    var selMain by remember { mutableStateOf<String?>(null) }
+    var selSub by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     val lines = vm.workingLines
 
@@ -85,7 +86,7 @@ fun PosSaleScreen(
 
     val visible =
         vm.products.filter {
-            (cat == "All" || it.cat == cat) &&
+            matchesCategory(it.mainCat.ifEmpty { it.cat }, it.cat, selMain, selSub) &&
                 (query.isBlank() || (it.name + " " + it.sku).contains(query, ignoreCase = true))
         }
 
@@ -189,7 +190,7 @@ fun PosSaleScreen(
                         SmallBtn(PosIcons.plus, "New") { vm.startNewTicket() }
                     }
 
-                    // Category chips
+                    // Category chips — main row, then a sub row when a main is selected.
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -197,9 +198,32 @@ fun PosSaleScreen(
                             .padding(horizontal = 22.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        vm.categories.forEach { cc ->
-                            val count = if (cc == "All") vm.products.size else vm.products.count { it.cat == cc }
-                            CategoryChip(cc, cat == cc, count) { cat = cc }
+                        CategoryChip("All", selMain == null, vm.products.size) {
+                            selMain = null
+                            selSub = null
+                        }
+                        vm.categoryTree.forEach { m ->
+                            val count = vm.products.count { (it.mainCat.ifEmpty { it.cat }) == m.name }
+                            CategoryChip(m.name, selMain == m.name, count) {
+                                selMain = m.name
+                                selSub = null
+                            }
+                        }
+                    }
+                    val mainSel = vm.categoryTree.firstOrNull { it.name == selMain }
+                    if (mainSel != null && mainSel.subs.isNotEmpty()) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 22.dp)
+                                .padding(bottom = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            CategoryChip("All ${mainSel.name}", selSub == null, vm.products.count { (it.mainCat.ifEmpty { it.cat }) == mainSel.name }) { selSub = null }
+                            mainSel.subs.forEach { s ->
+                                CategoryChip(s.name, selSub == s.name, vm.products.count { it.cat == s.name }) { selSub = s.name }
+                            }
                         }
                     }
 

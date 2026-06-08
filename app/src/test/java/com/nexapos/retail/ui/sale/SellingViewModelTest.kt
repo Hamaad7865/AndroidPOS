@@ -41,7 +41,7 @@ class SellingViewModelTest {
             val wrench = model.products.first { it.sku == "WRN-T17" }
             assertEquals(185, wrench.price)
             assertEquals("Tools", wrench.cat)
-            assertEquals(listOf("All", "Tools"), model.categories)
+            assertEquals(listOf("Tools"), model.categoryTree.map { it.name })
         }
 
     @Test
