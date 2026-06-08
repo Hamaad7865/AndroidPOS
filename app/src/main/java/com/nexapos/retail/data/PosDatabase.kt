@@ -41,7 +41,8 @@ import com.nexapos.retail.data.entity.SaleReturnItem
     // v5: added unique index on sales.receiptNo; invoice seq now derived in-txn from MAX(receiptNo).
     // v6: purchases gained expectedDelivery + notes columns.
     // v7: products gained a vatType column (additive, non-destructive migration MIGRATION_6_7).
-    version = 7,
+    // v8: sale_items gained a discountCents column (additive, non-destructive migration MIGRATION_7_8).
+    version = 8,
     exportSchema = true,
 )
 abstract class PosDatabase : RoomDatabase() {
@@ -67,5 +68,13 @@ val MIGRATION_6_7 =
     object : Migration(6, 7) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE products ADD COLUMN vatType TEXT NOT NULL DEFAULT 'STANDARD'")
+        }
+    }
+
+/** v7→v8: add sale_items.discountCents, defaulting existing rows to 0 (no line discount). */
+val MIGRATION_7_8 =
+    object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE sale_items ADD COLUMN discountCents INTEGER NOT NULL DEFAULT 0")
         }
     }

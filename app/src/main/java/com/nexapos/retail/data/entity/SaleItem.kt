@@ -1,5 +1,6 @@
 package com.nexapos.retail.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -26,4 +27,8 @@ data class SaleItem(
     val unitPriceCents: Long,
     val quantity: Int,
     val lineTotalCents: Long,
+    /** Flat Rs discount applied to this line (minor units). Default 0 — declared so the
+     *  v7→v8 migration's column default matches Room's expected schema (no destructive wipe). */
+    @ColumnInfo(defaultValue = "0")
+    val discountCents: Long = 0,
 )
