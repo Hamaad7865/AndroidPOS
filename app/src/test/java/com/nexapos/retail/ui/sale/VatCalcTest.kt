@@ -38,4 +38,27 @@ class VatCalcTest {
     fun `not vat registered yields zero`() {
         assertEquals(0, vatOf(listOf(line(1150, 2, VatType.STANDARD)), vatRegistered = false))
     }
+
+    @Test
+    fun `discountedVat with no discount equals plain inclusive vat`() {
+        assertEquals(150, discountedVat(listOf(line(1150, 1, VatType.STANDARD)), cartDiscount = 0, vatRegistered = true))
+    }
+
+    @Test
+    fun `item discount lowers the vat`() {
+        // net = 1150 - 150 = 1000 → vat = 1000 - 1000/1.15 = 130
+        val lines = listOf(PosLine(product(1150, VatType.STANDARD), 1, discount = 150))
+        assertEquals(130, discountedVat(lines, cartDiscount = 0, vatRegistered = true))
+    }
+
+    @Test
+    fun `cart discount lowers the vat proportionally`() {
+        // afterItems = 1150, cart 150 → final 1000 → vat = 130
+        assertEquals(130, discountedVat(listOf(line(1150, 1, VatType.STANDARD)), cartDiscount = 150, vatRegistered = true))
+    }
+
+    @Test
+    fun `discountedVat is zero when not registered`() {
+        assertEquals(0, discountedVat(listOf(line(1150, 1, VatType.STANDARD)), cartDiscount = 0, vatRegistered = false))
+    }
 }
