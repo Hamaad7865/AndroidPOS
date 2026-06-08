@@ -273,7 +273,7 @@ fun PosSaleScreen(
                     Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
                     Column(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 18.dp, vertical = 14.dp)) {
                         TotalRow("Subtotal", rs(subtotal), false)
-                        TotalRow("Discount", "— Rs 0", true)
+                        TotalRow("Discount", if (vm.discount > 0) "— " + rs(vm.discount) else "Rs 0", true)
                         if (vatRegistered) TotalRow("VAT (15%, incl.)", rs(vat), true)
                         Spacer(Modifier.height(10.dp))
                         Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))

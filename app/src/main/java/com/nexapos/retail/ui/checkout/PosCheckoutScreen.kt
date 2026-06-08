@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -184,20 +185,11 @@ private fun BillCard(
                 }
             }
             // charges
-            Row(
+            Column(
                 Modifier.fillMaxWidth().background(c.raised2).padding(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                NumField(
-                    label = "Discount (flat Rs)",
-                    value = vm.discount,
-                    onChange = { v ->
-                        vm.discount = v
-                        // Keep tender in sync if the cashier hasn't switched to credit.
-                        if (!vm.isCredit) vm.received = vm.total
-                    },
-                    modifier = Modifier.weight(1f),
-                )
+                DiscountField(vm, Modifier.fillMaxWidth())
                 NumField(
                     label = "Shipping",
                     value = vm.shipping,
@@ -205,7 +197,7 @@ private fun BillCard(
                         vm.shipping = v
                         if (!vm.isCredit) vm.received = vm.total
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -559,5 +551,98 @@ private fun NumField(
                 cursorBrush = SolidColor(c.amber),
             )
         }
+    }
+}
+
+@Composable
+private fun DiscountField(
+    vm: SellingViewModel,
+    modifier: Modifier,
+) {
+    val c = PosTheme.colors
+    val isPct = vm.discountIsPercent
+    Column(modifier) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Discount", fontSize = 11.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.SemiBold, color = c.muted)
+            Row(Modifier.clip(RoundedCornerShape(8.dp)).border(1.dp, c.hairline, RoundedCornerShape(8.dp))) {
+                ModeChip("%", isPct) { vm.applyDiscount(isPercent = true, value = vm.discountPercent) }
+                ModeChip("Rs", !isPct) { vm.applyDiscount(isPercent = false, value = vm.discount) }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(c.raised)
+                .border(1.dp, c.hairline, RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (!isPct) Text("Rs", fontSize = 13.sp, color = c.muted)
+            val shown = if (isPct) vm.discountPercent else vm.discount
+            BasicTextField(
+                value = if (shown == 0) "" else shown.toString(),
+                onValueChange = { vm.applyDiscount(isPercent = isPct, value = it.toIntOrNull() ?: 0) },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                cursorBrush = SolidColor(c.amber),
+            )
+            if (isPct) Text("%", fontSize = 13.sp, color = c.muted)
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(5, 10, 15).forEach { p ->
+                PresetChip("$p%") { vm.applyDiscount(isPercent = true, value = p) }
+            }
+            PresetChip("Clear") { vm.applyDiscount(isPercent = false, value = 0) }
+        }
+    }
+}
+
+@Composable
+private fun ModeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) c.ink else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
+    }
+}
+
+@Composable
+private fun RowScope.PresetChip(
+    label: String,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        Modifier
+            .weight(1f)
+            .height(30.dp)
+            .clip(CircleShape)
+            .background(c.raised)
+            .border(1.dp, c.hairline, CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1)
     }
 }
