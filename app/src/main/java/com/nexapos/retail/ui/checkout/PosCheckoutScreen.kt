@@ -177,7 +177,7 @@ private fun BillCard(
                         }
                         Column(Modifier.weight(1f)) {
                             Text(l.product.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = c.ink)
-                            Text("${l.product.sku} · ${l.qty} × ${rs(l.product.price)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                            Text("${l.product.sku} · ${l.qty} × ${rs(l.effectivePrice)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
                         }
                         Text(rs(l.lineTotal), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink)
                     }
@@ -622,7 +622,7 @@ private fun DiscountDialog(
                                 Text(line.product.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 Text(rs(line.lineTotal), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink)
                             }
-                            Text("${line.qty} × ${rs(line.product.price)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                            Text("${line.qty} × ${rs(line.effectivePrice)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
                             if (line.discount > 0) {
                                 Text("− ${rs(line.discount)} disc", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber)
                             }

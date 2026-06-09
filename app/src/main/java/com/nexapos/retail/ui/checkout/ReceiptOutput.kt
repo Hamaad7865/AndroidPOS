@@ -255,7 +255,7 @@ object ReceiptOutput {
         dash()
         sale.lines.forEach { l ->
             left(l.product.name, p.item)
-            row("   ${l.qty} × ${formatNum(l.product.price.toDouble(), 0)}", p.qty, formatNum(l.lineTotal.toDouble(), 0), p.amtR)
+            row("   ${l.qty} × ${formatNum(l.effectivePrice.toDouble(), 0)}", p.qty, formatNum(l.lineTotal.toDouble(), 0), p.amtR)
             if (l.discount > 0) row("   − discount", p.qty, "-" + formatNum(l.discount.toDouble(), 0), p.amtR)
         }
         dash()
@@ -359,7 +359,7 @@ object ReceiptOutput {
             sale.lines.joinToString("") { l ->
                 """
                 <tr><td colspan="2" class="nm">${esc(l.product.name)}</td></tr>
-                <tr><td class="qty">${l.qty} × ${formatNum(l.product.price.toDouble(), 0)}</td>
+                <tr><td class="qty">${l.qty} × ${formatNum(l.effectivePrice.toDouble(), 0)}</td>
                     <td class="amt">${formatNum(l.lineTotal.toDouble(), 0)}</td></tr>
                 ${if (l.discount > 0) "<tr><td class=\"qty\">− discount</td><td class=\"amt\">-${formatNum(l.discount.toDouble(), 0)}</td></tr>" else ""}
                 """.trimIndent()

@@ -308,7 +308,7 @@ private fun ReceiptPaper(sale: SaleSnapshot) {
                     Text(l.product.name, fontFamily = HankenGrotesk, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = receiptInk, modifier = Modifier.weight(1f))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${l.qty} × ${formatNum(l.product.price.toDouble(), 0)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
+                    Text("${l.qty} × ${formatNum(l.effectivePrice.toDouble(), 0)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
                     Text(formatNum(l.lineTotal.toDouble(), 0), fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
                 }
                 if (l.discount > 0) {
