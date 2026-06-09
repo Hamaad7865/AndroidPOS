@@ -94,6 +94,7 @@ fun PosSaleScreen(
     var showLookup by remember { mutableStateOf(false) }
     var showPrice by remember { mutableStateOf(false) }
     var showVoid by remember { mutableStateOf(false) }
+    var showRemarks by remember { mutableStateOf(false) }
     val actionCtx = androidx.compose.ui.platform.LocalContext.current
     val lines = vm.workingLines
 
@@ -412,13 +413,14 @@ fun PosSaleScreen(
                                 ActionBtn("Hold", Modifier.weight(1f)) { vm.holdCurrentTicket() }
                                 ActionBtn("Void", Modifier.weight(1f)) { showVoid = true }
                                 ActionBtn("Exit", Modifier.weight(1f)) { onNav("home") }
-                                Spacer(Modifier.weight(1f))
+                                ActionBtn(if (vm.saleNote.isBlank()) "Remarks" else "Remarks •", Modifier.weight(1f)) { showRemarks = true }
                             }
                         }
                         Spacer(Modifier.height(8.dp))
                         ChargeButton(total, enabled = lines.isNotEmpty(), onClick = onCharge)
                         if (showLookup) ItemLookupDialog(vm) { showLookup = false }
                         if (showPrice) PriceDialog(vm) { showPrice = false }
+                        if (showRemarks) RemarksDialog(vm) { showRemarks = false }
                         if (showVoid) {
                             AlertDialog(
                                 onDismissRequest = { showVoid = false },
@@ -1152,6 +1154,40 @@ private fun PriceDialog(
                             )
                         }
                     }
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun RemarksDialog(
+    vm: SellingViewModel,
+    onDismiss: () -> Unit,
+) {
+    val c = PosTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        dismissButton = { TextButton(onClick = { vm.saleNote = "" }) { Text("Clear") } },
+        title = { Text("Remarks") },
+        text = {
+            Column(Modifier.widthIn(min = 380.dp)) {
+                Box(
+                    Modifier.fillMaxWidth().heightIn(min = 96.dp).clip(RoundedCornerShape(10.dp))
+                        .background(c.raised).border(1.dp, c.hairline, RoundedCornerShape(10.dp)).padding(12.dp),
+                ) {
+                    BasicTextField(
+                        value = vm.saleNote,
+                        onValueChange = { vm.saleNote = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, color = c.ink),
+                        cursorBrush = SolidColor(c.amber),
+                        decorationBox = { inner ->
+                            if (vm.saleNote.isEmpty()) Text("Delivery instructions, customer ref…", fontSize = 13.sp, color = c.muted)
+                            inner()
+                        },
+                    )
                 }
             }
         },
