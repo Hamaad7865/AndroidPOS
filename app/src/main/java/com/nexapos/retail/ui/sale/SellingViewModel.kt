@@ -91,6 +91,8 @@ data class SaleSnapshot(
     val customerPhone: String = "",
     /** For credit sales: the unpaid portion the customer now owes (whole rupees). */
     val creditDue: Int = 0,
+    /** Free-text remark captured at the till. */
+    val note: String = "",
 )
 
 /**
@@ -138,6 +140,9 @@ class SellingViewModel(
     var received by mutableStateOf(0)
     var discountIsPercent by mutableStateOf(false)
     var discountPercent by mutableStateOf(0)
+
+    /** Free-text remark for the current ticket; printed on the receipt + saved on the sale. */
+    var saleNote by mutableStateOf("")
 
     var lastSale by mutableStateOf<SaleSnapshot?>(null)
         private set
@@ -209,6 +214,7 @@ class SellingViewModel(
     fun startNewTicket() {
         workingLines.clear()
         selectedCustomer = null
+        saleNote = ""
         discount = 0
         discountIsPercent = false
         discountPercent = 0
@@ -333,6 +339,7 @@ class SellingViewModel(
 
     fun clearCart() {
         workingLines.clear()
+        saleNote = ""
     }
 
     // --- Hold / resume ---------------------------------------------------
@@ -495,6 +502,7 @@ class SellingViewModel(
                 customerName = selectedCustomer?.name ?: "Walk-in",
                 customerPhone = selectedCustomer?.phone.orEmpty(),
                 creditDue = creditDue,
+                note = saleNote.trim(),
             )
         lastSale = snapshot
         saleError = null
@@ -525,6 +533,7 @@ class SellingViewModel(
                 changeCents = snapshot.change.coerceAtLeast(0) * CENTS_PER_RUPEE,
                 customerId = customer?.id,
                 customerName = customer?.name ?: snapshot.customerName,
+                note = snapshot.note,
             )
         val items =
             snapshot.lines.map { line ->

@@ -60,6 +60,19 @@ class SellingViewModelTest {
         }
 
     @Test
+    fun `sale note is persisted on the sale`() =
+        runTest {
+            val model = vm()
+            val wrench = model.products.first { it.sku == "WRN-T17" }
+            model.addToCart(wrench)
+            model.saleNote = "Deliver tomorrow AM"
+            model.beginCheckout()
+            model.complete()
+            val (sale, _) = sales.recorded.first()
+            assertEquals("Deliver tomorrow AM", sale.note)
+        }
+
+    @Test
     fun `totals use VAT-inclusive pricing — VAT is extracted not added`() =
         runTest {
             val model = vm()
