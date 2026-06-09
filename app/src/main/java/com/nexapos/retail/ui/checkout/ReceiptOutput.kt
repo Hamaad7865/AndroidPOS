@@ -270,6 +270,7 @@ object ReceiptOutput {
         } else {
             row("Change", p.label, money(maxOf(0, sale.change)), p.valueR)
         }
+        if (sale.note.isNotBlank()) left("Note: ${sale.note}", p.item)
         dash()
         ReceiptSettings.footerNote(context).takeIf { it.isNotBlank() }?.let { centre(it, p.foot) }
         centre("powered by NexaPOS · ${sale.invoiceNo}", p.foot)
@@ -409,6 +410,7 @@ object ReceiptOutput {
                 <tr><td class="k">Paid · ${esc(sale.pay)}</td><td class="amt">${money(sale.received)}</td></tr>
                 $tailRow
               </table>
+              ${if (sale.note.isNotBlank()) "<div class=\"ft\" style=\"text-align:left;margin-top:6px\">Note: ${esc(sale.note)}</div>" else ""}
               <hr>
               <div class="ft">$footer</div>
               <div class="ft">powered by NexaPOS · ${esc(sale.invoiceNo)}</div>

@@ -339,6 +339,9 @@ private fun ReceiptPaper(sale: SaleSnapshot) {
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+            if (sale.note.isNotBlank()) {
+                Text("Note: ${sale.note}", fontFamily = JetBrainsMono, fontSize = 10.sp, color = receiptInk, modifier = Modifier.padding(top = 4.dp))
+            }
             DashedLine()
             Text(
                 com.nexapos.retail.data.profile.ReceiptSettings.footerNote(context),
