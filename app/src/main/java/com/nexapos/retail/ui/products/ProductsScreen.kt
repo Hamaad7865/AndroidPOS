@@ -69,6 +69,8 @@ import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.components.ProductThumb
 import com.nexapos.retail.ui.components.formatNum
 import com.nexapos.retail.ui.sale.PosProduct
+import com.nexapos.retail.ui.sale.categoryLabel
+import com.nexapos.retail.ui.sale.matchesCategory
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
@@ -109,16 +111,17 @@ fun ProductsListScreen(
     val c = PosTheme.colors
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
-    var chip by remember { mutableStateOf("All") }
+    var selMain by remember { mutableStateOf<String?>(null) }
+    var selSub by remember { mutableStateOf<String?>(null) }
     var stockFilter by remember { mutableStateOf(StockFilter.ALL) }
     var sortBy by remember { mutableStateOf(SortBy.NAME_AZ) }
     var showFilters by remember { mutableStateOf(false) }
 
     val rows =
-        remember(vm.products, chip, query, stockFilter, sortBy) {
+        remember(vm.products, selMain, selSub, query, stockFilter, sortBy) {
             vm.products
                 .filter { p ->
-                    val catOk = chip == "All" || p.cat == chip
+                    val catOk = matchesCategory(p.mainCat.ifEmpty { p.cat }, p.cat, selMain, selSub)
                     val qOk =
                         query.isBlank() ||
                             (p.name + p.sku + (p.barcode ?: "")).contains(query, ignoreCase = true)
@@ -209,7 +212,7 @@ fun ProductsListScreen(
     NavShell(active = "products", onNav = onNav) {
         AppBar(
             title = "Products",
-            subtitle = "${vm.products.size} SKUs · ${(vm.categories.size - 1).coerceAtLeast(0)} categories · ${rs(vm.stockValue)} stock value",
+            subtitle = "${vm.products.size} SKUs · ${vm.categoryTree.size} categories · ${rs(vm.stockValue)} stock value",
             right = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SecBtn(PosIcons.upload, "Import") { showImportHelp = true }
@@ -244,7 +247,19 @@ fun ProductsListScreen(
                 Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                vm.categories.forEach { Chip(it, chip == it) { chip = it } }
+                Chip("All", selMain == null) {
+                    selMain = null
+                    selSub = null
+                }
+                vm.categoryTree.forEach { m ->
+                    Chip(m.name, selMain == m.name) {
+                        selMain = m.name
+                        selSub = null
+                    }
+                }
+                vm.categoryTree.firstOrNull { it.name == selMain }?.subs?.forEach { s ->
+                    Chip("· ${s.name}", selSub == s.name) { selSub = s.name }
+                }
             }
             SecBtn(PosIcons.filter, if (filterActive) "Filters ●" else "Filters") { showFilters = true }
         }
@@ -341,7 +356,7 @@ private fun TableRow(
                 }
             Text(codeLine, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(p.cat, Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(categoryLabel(p.mainCat, p.cat), Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(if (p.cost > 0) rs(p.cost) else "—", Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.graphite, textAlign = TextAlign.End)
         Text(rs(p.price), Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.End)
         Box(Modifier.width(64.dp), contentAlignment = Alignment.CenterEnd) { StockBadge(p.stock) }
@@ -583,7 +598,8 @@ fun AddProductScreen(
     var name by remember { mutableStateOf("") }
     var sku by remember { mutableStateOf("") }
     var barcode by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("") }
+    var mainCategory by remember { mutableStateOf("") }
+    var subCategory by remember { mutableStateOf("") }
     var brand by remember { mutableStateOf("") }
     var rack by remember { mutableStateOf("") }
     var shelf by remember { mutableStateOf("") }
@@ -615,7 +631,9 @@ fun AddProductScreen(
                 sku = p.sku
                 barcode = p.barcode.orEmpty()
                 val posModel = vm.products.firstOrNull { it.id == p.id.toString() }
-                category = posModel?.cat?.takeIf { it != "Other" } ?: ""
+                val (mn, sn) = vm.categoryNamesFor(p.id)
+                mainCategory = mn
+                subCategory = sn
                 brand = posModel?.brand.orEmpty()
                 rack = p.rack
                 shelf = p.shelf
@@ -659,7 +677,8 @@ fun AddProductScreen(
             barcode = barcode,
             priceRupees = priceRupees,
             costRupees = costRupees,
-            categoryName = category,
+            mainCategoryName = mainCategory,
+            subCategoryName = subCategory,
             brandName = brand,
             stock = stockN,
             lowStockThreshold = lowStockN,
@@ -783,12 +802,23 @@ fun AddProductScreen(
                 FormCard("Classification") {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         PickerField(
-                            "Category",
-                            category,
-                            options = vm.categories.filter { it != "All" },
-                            onValueChange = { category = it },
+                            "Main category",
+                            mainCategory,
+                            options = vm.categoryTree.map { it.name },
+                            onValueChange = {
+                                mainCategory = it
+                                subCategory = ""
+                            },
                             Modifier.weight(1f),
                             placeholder = "Tools, Plumbing, Paint…",
+                        )
+                        PickerField(
+                            "Sub-category (optional)",
+                            subCategory,
+                            options = vm.categoryTree.firstOrNull { it.name.equals(mainCategory, ignoreCase = true) }?.subs?.map { it.name } ?: emptyList(),
+                            onValueChange = { subCategory = it },
+                            Modifier.weight(1f),
+                            placeholder = "Pipes, Fittings…",
                         )
                         PickerField(
                             "Brand",

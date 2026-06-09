@@ -42,7 +42,8 @@ import com.nexapos.retail.data.entity.SaleReturnItem
     // v6: purchases gained expectedDelivery + notes columns.
     // v7: products gained a vatType column (additive, non-destructive migration MIGRATION_6_7).
     // v8: sale_items gained a discountCents column (additive, non-destructive migration MIGRATION_7_8).
-    version = 8,
+    // v9: categories gained a parentId column for sub-categories (additive, non-destructive MIGRATION_8_9).
+    version = 9,
     exportSchema = true,
 )
 abstract class PosDatabase : RoomDatabase() {
@@ -76,5 +77,13 @@ val MIGRATION_7_8 =
     object : Migration(7, 8) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE sale_items ADD COLUMN discountCents INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+/** v8→v9: add categories.parentId (nullable) for sub-categories; existing rows stay mains (null). */
+val MIGRATION_8_9 =
+    object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE categories ADD COLUMN parentId INTEGER")
         }
     }

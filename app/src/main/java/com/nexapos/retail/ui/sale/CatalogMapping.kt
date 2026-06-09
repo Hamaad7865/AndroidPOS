@@ -16,13 +16,18 @@ fun List<Product>.toPosProducts(
     categories: List<Category>,
     brands: List<Brand> = emptyList(),
 ): List<PosProduct> {
-    val catById = categories.associate { it.id to it.name }
+    val catById = categories.associateBy { it.id }
+    val nameById = categories.associate { it.id to it.name }
     val brandById = brands.associate { it.id to it.name }
     return map { product ->
+        val leaf = catById[product.categoryId]
+        val leafName = leaf?.name ?: UNCATEGORISED
+        val mainName = leaf?.let { nameById[mainIdOf(it)] } ?: leafName
         PosProduct(
             id = product.id.toString(),
             name = product.name,
-            cat = catById[product.categoryId] ?: UNCATEGORISED,
+            cat = leafName,
+            mainCat = mainName,
             price = (product.priceCents / CENTS_PER_RUPEE).toInt(),
             sku = product.sku,
             stock = product.stockQty,
@@ -43,5 +48,5 @@ fun List<Product>.toPosProducts(
     }
 }
 
-/** Category chip labels, always starting with [ALL_CATEGORY]. */
-fun List<Category>.toFilterLabels(): List<String> = listOf(ALL_CATEGORY) + map { it.name }
+/** The category tree (mains + their subs) used by the drill-down chip rows. */
+fun List<Category>.toCategoryTree(): List<MainCat> = buildCategoryTree(this)

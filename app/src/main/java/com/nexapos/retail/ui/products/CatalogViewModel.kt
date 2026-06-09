@@ -9,9 +9,9 @@ import com.nexapos.retail.data.entity.Brand
 import com.nexapos.retail.data.entity.Category
 import com.nexapos.retail.data.entity.Product
 import com.nexapos.retail.domain.repository.CatalogRepository
-import com.nexapos.retail.ui.sale.ALL_CATEGORY
+import com.nexapos.retail.ui.sale.MainCat
 import com.nexapos.retail.ui.sale.PosProduct
-import com.nexapos.retail.ui.sale.toFilterLabels
+import com.nexapos.retail.ui.sale.toCategoryTree
 import com.nexapos.retail.ui.sale.toPosProducts
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -37,7 +37,7 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
     var products by mutableStateOf<List<PosProduct>>(emptyList())
         private set
 
-    var categories by mutableStateOf(listOf(ALL_CATEGORY))
+    var categoryTree by mutableStateOf<List<MainCat>>(emptyList())
         private set
 
     var brands by mutableStateOf<List<String>>(emptyList())
@@ -57,7 +57,7 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
                     categoryEntities = cats
                     brandEntities = brs
                     products = prods.toPosProducts(cats, brs)
-                    categories = cats.toFilterLabels()
+                    categoryTree = cats.toCategoryTree()
                     brands = brs.map { it.name }
                 }
         }
@@ -83,7 +83,8 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
         barcode: String?,
         priceRupees: Int,
         costRupees: Int,
-        categoryName: String,
+        mainCategoryName: String,
+        subCategoryName: String,
         brandName: String,
         stock: Int,
         lowStockThreshold: Int,
@@ -96,14 +97,25 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
         imagePath: String?,
     ) {
         if (name.isBlank() || priceRupees <= 0) return
-        val trimmedCat = categoryName.trim()
+        val trimmedMain = mainCategoryName.trim()
+        val trimmedSub = subCategoryName.trim()
         val trimmedBrand = brandName.trim()
         viewModelScope.launch {
+            val mainId =
+                if (trimmedMain.isBlank()) {
+                    null
+                } else {
+                    categoryEntities.firstOrNull { it.parentId == null && it.name.equals(trimmedMain, ignoreCase = true) }?.id
+                        ?: catalogRepository.upsertCategory(Category(name = trimmedMain, parentId = null))
+                }
             val categoryId =
-                resolveLookupId(
-                    name = trimmedCat,
-                    existing = categoryEntities.firstOrNull { it.name.equals(trimmedCat, ignoreCase = true) }?.id,
-                ) { catalogRepository.upsertCategory(Category(name = trimmedCat)) }
+                when {
+                    mainId == null -> null
+                    trimmedSub.isBlank() -> mainId
+                    else ->
+                        categoryEntities.firstOrNull { it.parentId == mainId && it.name.equals(trimmedSub, ignoreCase = true) }?.id
+                            ?: catalogRepository.upsertCategory(Category(name = trimmedSub, parentId = mainId))
+                }
             val brandId =
                 resolveLookupId(
                     name = trimmedBrand,
@@ -136,6 +148,17 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
                     imagePath = imagePath ?: previous?.imagePath,
                 ),
             )
+        }
+    }
+
+    /** (mainName, subName) for a product; subName is "" when it sits directly under a main. */
+    suspend fun categoryNamesFor(productId: Long): Pair<String, String> {
+        val catId = catalogRepository.getProduct(productId)?.categoryId ?: return "" to ""
+        val leaf = categoryEntities.firstOrNull { it.id == catId } ?: return "" to ""
+        return if (leaf.parentId == null) {
+            leaf.name to ""
+        } else {
+            (categoryEntities.firstOrNull { it.id == leaf.parentId }?.name ?: "") to leaf.name
         }
     }
 

@@ -20,6 +20,8 @@ data class PosProduct(
     val id: String,
     val name: String,
     val cat: String,
+    /** The product's MAIN category name (= cat when the product sits directly under a main). */
+    val mainCat: String = "",
     val price: Int,
     val sku: String,
     val stock: Int,
@@ -104,8 +106,8 @@ class SellingViewModel(
     var products by mutableStateOf<List<PosProduct>>(emptyList())
         private set
 
-    /** Category filter labels, always starting with "All". */
-    var categories by mutableStateOf(listOf(ALL_CATEGORY))
+    /** Category tree (mains + subs) for the drill-down filter chips. */
+    var categoryTree by mutableStateOf<List<MainCat>>(emptyList())
         private set
 
     /** The in-progress ticket carried POS → Checkout → Receipt. */
@@ -162,10 +164,10 @@ class SellingViewModel(
                 catalogRepository.observeProducts(),
                 catalogRepository.observeCategories(),
             ) { prods, cats ->
-                prods.toPosProducts(cats) to cats.toFilterLabels()
+                prods.toPosProducts(cats) to cats.toCategoryTree()
             }.collect { (mapped, labels) ->
                 products = mapped
-                categories = labels
+                categoryTree = labels
             }
         }
         viewModelScope.launch { partiesRepository.observeCustomers().collect { customers = it } }
