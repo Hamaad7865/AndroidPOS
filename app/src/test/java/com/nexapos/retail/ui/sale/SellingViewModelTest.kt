@@ -70,6 +70,8 @@ class SellingViewModelTest {
             model.complete()
             val (sale, _) = sales.recorded.first()
             assertEquals("Deliver tomorrow AM", sale.note)
+            // the note must reset after the sale so it can't leak onto the next ticket
+            assertEquals("", model.saleNote)
         }
 
     @Test

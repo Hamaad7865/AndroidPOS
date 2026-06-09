@@ -510,6 +510,9 @@ class SellingViewModel(
         persist(snapshot, capturedCustomer)
         workingLines.clear()
         selectedCustomer = null
+        // The note is already captured in the snapshot above; clear it so it can't leak
+        // onto the next ticket (the receipt screen pops back to POS without startNewTicket).
+        saleNote = ""
     }
 
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
