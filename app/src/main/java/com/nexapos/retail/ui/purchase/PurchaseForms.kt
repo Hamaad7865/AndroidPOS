@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -33,7 +35,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -52,6 +57,7 @@ import com.nexapos.retail.ui.components.SecBtn
 import com.nexapos.retail.ui.components.SumRow
 import com.nexapos.retail.ui.components.WideBtn
 import com.nexapos.retail.ui.components.rsStr
+import com.nexapos.retail.ui.sale.percentToFlat
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
 import kotlinx.coroutines.flow.collectLatest
@@ -110,6 +116,10 @@ fun AddPurchaseScreen(
     }
 
     val subtotal = items.sumOf { it.quantity * it.unitCostRupees }
+    var discountIsPercent by remember { mutableStateOf(false) }
+    var discountValue by remember { mutableStateOf(0) }
+    val discountFlat = (if (discountIsPercent) percentToFlat(subtotal, discountValue) else discountValue).coerceIn(0, subtotal)
+    val total = subtotal - discountFlat
     val canConfirm = supplierName.isNotBlank() && items.isNotEmpty()
 
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -127,6 +137,7 @@ fun AddPurchaseScreen(
             status = statusLabel.lowercase(),
             expectedDelivery = expectedDelivery,
             notes = notes,
+            discountRupees = discountFlat,
         )
         if (newProductCount > 0) {
             android.widget.Toast.makeText(
@@ -329,13 +340,44 @@ fun AddPurchaseScreen(
                 SumRow("Units", "${items.sumOf { it.quantity }}")
                 Spacer(Modifier.height(6.dp))
                 SumRow("Subtotal", rsStr(subtotal), mono = true)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Discount", fontSize = 12.sp, color = c.muted)
+                    Row(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, c.hairline, RoundedCornerShape(7.dp))) {
+                        DiscMode("%", discountIsPercent) { discountIsPercent = true }
+                        DiscMode("Rs", !discountIsPercent) { discountIsPercent = false }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp)).background(c.raised2)
+                        .border(1.dp, c.hairline, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (!discountIsPercent) Text("Rs", fontSize = 13.sp, color = c.muted)
+                    BasicTextField(
+                        value = if (discountValue == 0) "" else discountValue.toString(),
+                        onValueChange = { discountValue = it.toIntOrNull() ?: 0 },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        cursorBrush = SolidColor(c.amber),
+                    )
+                    if (discountIsPercent) Text("%", fontSize = 13.sp, color = c.muted)
+                }
+                if (discountFlat > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    SumRow("Discount", "− ${rsStr(discountFlat)}", mono = true)
+                }
                 Spacer(Modifier.height(10.dp))
                 Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("TOTAL", fontSize = 13.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.SemiBold, color = c.muted)
                     Text(
-                        rsStr(subtotal),
+                        rsStr(total),
                         fontFamily = JetBrainsMono,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -817,6 +859,10 @@ private fun DetailTotalsCard(
         SumRow("Line items", "${items.size}")
         Spacer(Modifier.height(6.dp))
         SumRow("Subtotal", rsStr(subtotal), mono = true)
+        if (purchase.discountCents > 0) {
+            Spacer(Modifier.height(6.dp))
+            SumRow("Discount", "− ${rsStr((purchase.discountCents / CENTS_PER_RUPEE).toInt())}", mono = true)
+        }
         Spacer(Modifier.height(10.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
         Spacer(Modifier.height(10.dp))
@@ -834,6 +880,25 @@ private fun DetailTotalsCard(
                 color = c.ink,
             )
         }
+    }
+}
+
+@Composable
+private fun DiscMode(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (selected) c.ink else androidx.compose.ui.graphics.Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
     }
 }
 
