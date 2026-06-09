@@ -45,8 +45,11 @@ data class PosLine(
     val product: PosProduct,
     val qty: Int,
     val discount: Int = 0,
+    /** Custom unit price for this sale only; null = the catalog price. */
+    val priceOverride: Int? = null,
 ) {
-    val lineTotal get() = product.price * qty
+    val effectivePrice get() = priceOverride ?: product.price
+    val lineTotal get() = effectivePrice * qty
 
     /** Line amount after its own discount (never negative). */
     val net get() = (lineTotal - discount).coerceAtLeast(0)
@@ -249,6 +252,17 @@ class SellingViewModel(
         // A cart % is stored as a flat Rs against afterItems at apply time; recompute it so
         // editing an item discount keeps "X% off the cart" honest as the base changes.
         if (discountIsPercent) discount = percentToFlat(afterItems, discountPercent)
+        if (!isCredit) received = total
+    }
+
+    /** Overrides a line's unit price for this sale (catalog price untouched). */
+    fun setLinePrice(
+        productId: String,
+        priceRupees: Int,
+    ) {
+        val i = workingLines.indexOfFirst { it.product.id == productId }
+        if (i < 0) return
+        workingLines[i] = workingLines[i].copy(priceOverride = priceRupees.coerceAtLeast(0))
         if (!isCredit) received = total
     }
 
@@ -518,7 +532,7 @@ class SellingViewModel(
                     saleId = 0,
                     productId = line.product.id.toLongOrNull(),
                     nameSnapshot = line.product.name,
-                    unitPriceCents = line.product.price * CENTS_PER_RUPEE,
+                    unitPriceCents = line.effectivePrice * CENTS_PER_RUPEE,
                     quantity = line.qty,
                     lineTotalCents = line.lineTotal * CENTS_PER_RUPEE,
                     discountCents = line.discount * CENTS_PER_RUPEE,

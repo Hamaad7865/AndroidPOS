@@ -45,6 +45,21 @@ class SellingViewModelTest {
         }
 
     @Test
+    fun `price override changes the line total and persisted unit price`() =
+        runTest {
+            val model = vm()
+            val wrench = model.products.first { it.sku == "WRN-T17" }
+            model.addToCart(wrench)
+            model.setLinePrice(wrench.id, 200)
+            assertEquals(200, model.subtotal)
+            model.beginCheckout()
+            model.complete()
+            val (_, items) = sales.recorded.first()
+            assertEquals(200 * 100L, items.first().unitPriceCents)
+            assertEquals(200 * 100L, items.first().lineTotalCents)
+        }
+
+    @Test
     fun `totals use VAT-inclusive pricing — VAT is extracted not added`() =
         runTest {
             val model = vm()
