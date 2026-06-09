@@ -14,15 +14,21 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,10 +42,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -81,6 +91,10 @@ fun PosSaleScreen(
     var selMain by remember { mutableStateOf<String?>(null) }
     var selSub by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
+    var showLookup by remember { mutableStateOf(false) }
+    var showPrice by remember { mutableStateOf(false) }
+    var showVoid by remember { mutableStateOf(false) }
+    val actionCtx = androidx.compose.ui.platform.LocalContext.current
     val lines = vm.workingLines
 
     var rootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -381,15 +395,44 @@ fun PosSaleScreen(
                             )
                         }
                         Spacer(Modifier.height(14.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SecondaryButton("Clear", Modifier.weight(1f)) { vm.clearCart() }
-                            SecondaryButton(
-                                label = if (lines.isEmpty()) "Hold" else "Hold ticket",
-                                modifier = Modifier.weight(1f),
-                            ) { vm.holdCurrentTicket() }
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ActionBtn("Lookup", Modifier.weight(1f)) { showLookup = true }
+                                ActionBtn("Price", Modifier.weight(1f)) { showPrice = true }
+                                ActionBtn("Reprint", Modifier.weight(1f)) {
+                                    if (vm.lastSale != null) {
+                                        onNav("receipt")
+                                    } else {
+                                        android.widget.Toast.makeText(actionCtx, "No recent sale to reprint.", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                ActionBtn("Returns", Modifier.weight(1f)) { onNav("sales-list") }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ActionBtn("Hold", Modifier.weight(1f)) { vm.holdCurrentTicket() }
+                                ActionBtn("Void", Modifier.weight(1f)) { showVoid = true }
+                                ActionBtn("Exit", Modifier.weight(1f)) { onNav("home") }
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
                         Spacer(Modifier.height(8.dp))
                         ChargeButton(total, enabled = lines.isNotEmpty(), onClick = onCharge)
+                        if (showLookup) ItemLookupDialog(vm) { showLookup = false }
+                        if (showPrice) PriceDialog(vm) { showPrice = false }
+                        if (showVoid) {
+                            AlertDialog(
+                                onDismissRequest = { showVoid = false },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        vm.clearCart()
+                                        showVoid = false
+                                    }) { Text("Void") }
+                                },
+                                dismissButton = { TextButton(onClick = { showVoid = false }) { Text("Cancel") } },
+                                title = { Text("Void this ticket?") },
+                                text = { Text("This removes every line from the current ticket.") },
+                            )
+                        }
                     }
                 }
             },
@@ -1001,4 +1044,116 @@ private fun TotalRow(
             color = if (muted) c.muted else c.ink,
         )
     }
+}
+
+@Composable
+private fun ActionBtn(
+    label: String,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(c.raised)
+            .border(1.dp, c.hairline, RoundedCornerShape(10.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ItemLookupDialog(
+    vm: SellingViewModel,
+    onDismiss: () -> Unit,
+) {
+    val c = PosTheme.colors
+    var q by remember { mutableStateOf("") }
+    val results = vm.products.filter { q.isBlank() || (it.name + " " + it.sku).contains(q, ignoreCase = true) }.take(50)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text("Item lookup") },
+        text = {
+            Column(Modifier.widthIn(min = 380.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(10.dp)).background(c.raised)
+                        .border(1.dp, c.hairline, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BasicTextField(
+                        value = q,
+                        onValueChange = { q = it },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, color = c.ink),
+                        cursorBrush = SolidColor(c.amber),
+                        decorationBox = { inner ->
+                            if (q.isEmpty()) Text("Search name or SKU…", fontSize = 13.sp, color = c.muted)
+                            inner()
+                        },
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Column(Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    results.forEach { p ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(Modifier.weight(1f)) {
+                                Text(p.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("Stock: ${p.stock} · ${p.sku.ifBlank { "no SKU" }}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                            }
+                            Text(rs(p.price), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                        }
+                    }
+                    if (results.isEmpty()) Text("No matches.", fontSize = 12.sp, color = c.muted)
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun PriceDialog(
+    vm: SellingViewModel,
+    onDismiss: () -> Unit,
+) {
+    val c = PosTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        title = { Text("Override price") },
+        text = {
+            Column(Modifier.widthIn(min = 380.dp).heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (vm.workingLines.isEmpty()) {
+                    Text("Add items to the ticket first.", fontSize = 12.sp, color = c.muted)
+                }
+                vm.workingLines.forEach { line ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(line.product.name, fontSize = 13.sp, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Row(
+                            Modifier.width(120.dp).height(40.dp).clip(RoundedCornerShape(10.dp)).background(c.raised)
+                                .border(1.dp, c.hairline, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text("Rs", fontSize = 12.sp, color = c.muted)
+                            BasicTextField(
+                                value = if (line.effectivePrice == 0) "" else line.effectivePrice.toString(),
+                                onValueChange = { vm.setLinePrice(line.product.id, it.toIntOrNull() ?: 0) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                cursorBrush = SolidColor(c.amber),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+    )
 }
