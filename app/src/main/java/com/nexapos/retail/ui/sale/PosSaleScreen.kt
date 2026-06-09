@@ -588,7 +588,7 @@ private fun TicketLine(
                 color = c.ink,
             )
             Text(
-                "${line.product.sku} · ${rs(line.product.price)}",
+                "${line.product.sku} · ${rs(line.effectivePrice)}",
                 fontFamily = JetBrainsMono,
                 fontSize = 11.sp,
                 color = c.muted,
