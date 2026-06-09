@@ -74,6 +74,10 @@ fun PosSaleScreen(
     onNav: (String) -> Unit,
 ) {
     val c = PosTheme.colors
+    val reorderCtx = androidx.compose.ui.platform.LocalContext.current
+    var order by remember { mutableStateOf(com.nexapos.retail.data.profile.PosLayoutPrefs.order(reorderCtx)) }
+    var arrangeMode by remember { mutableStateOf(false) }
+    var pickedId by remember { mutableStateOf<String?>(null) }
     var selMain by remember { mutableStateOf<String?>(null) }
     var selSub by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
@@ -85,7 +89,7 @@ fun PosSaleScreen(
     var chipSeq by remember { mutableStateOf(0L) }
 
     val visible =
-        vm.products.filter {
+        orderProducts(vm.products, order).filter {
             matchesCategory(it.mainCat.ifEmpty { it.cat }, it.cat, selMain, selSub) &&
                 (query.isBlank() || (it.name + " " + it.sku).contains(query, ignoreCase = true))
         }
@@ -188,6 +192,10 @@ fun PosSaleScreen(
                             }
                         }
                         SmallBtn(PosIcons.plus, "New") { vm.startNewTicket() }
+                        SmallBtn(PosIcons.filter, if (arrangeMode) "Done" else "Arrange") {
+                            arrangeMode = !arrangeMode
+                            pickedId = null
+                        }
                     }
 
                     // Category chips — main row, then a sub row when a main is selected.
@@ -227,6 +235,26 @@ fun PosSaleScreen(
                         }
                     }
 
+                    if (arrangeMode) {
+                        val pickedName = visible.firstOrNull { it.id == pickedId }?.name
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                if (pickedName != null) "Moving \"$pickedName\" — tap where it should go" else "Tap a product to move it",
+                                fontSize = 12.sp,
+                                color = c.amber,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            SmallBtn(PosIcons.trash, "Reset A–Z") {
+                                com.nexapos.retail.data.profile.PosLayoutPrefs.clear(reorderCtx)
+                                order = emptyList()
+                                pickedId = null
+                            }
+                        }
+                    }
                     // Product grid (4 columns, staggered reveal)
                     Column(
                         Modifier
@@ -241,7 +269,27 @@ fun PosSaleScreen(
                                     ProductCard(
                                         p = p,
                                         index = rowIdx * 4 + colIdx,
-                                        onAdd = { coords -> add(p, coords) },
+                                        picked = arrangeMode && pickedId == p.id,
+                                        onAdd = { coords ->
+                                            if (arrangeMode) {
+                                                val picked = pickedId
+                                                when {
+                                                    picked == null -> pickedId = p.id
+                                                    picked == p.id -> pickedId = null
+                                                    else -> {
+                                                        val fullIds = orderProducts(vm.products, order).map { it.id }
+                                                        val without = fullIds.filterNot { it == picked }
+                                                        val idx = without.indexOf(p.id).coerceAtLeast(0)
+                                                        val newIds = without.toMutableList().also { it.add(idx, picked) }
+                                                        com.nexapos.retail.data.profile.PosLayoutPrefs.setOrder(reorderCtx, newIds)
+                                                        order = newIds
+                                                        pickedId = null
+                                                    }
+                                                }
+                                            } else {
+                                                add(p, coords)
+                                            }
+                                        },
                                         modifier = Modifier.weight(1f),
                                     )
                                 }
@@ -377,6 +425,7 @@ private fun ProductCard(
     index: Int,
     onAdd: (LayoutCoordinates?) -> Unit,
     modifier: Modifier = Modifier,
+    picked: Boolean = false,
 ) {
     val c = PosTheme.colors
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -407,7 +456,7 @@ private fun ProductCard(
                 }
                 .clip(RoundedCornerShape(14.dp))
                 .background(c.raised)
-                .border(1.dp, c.hairline, RoundedCornerShape(14.dp))
+                .border(if (picked) 2.dp else 1.dp, if (picked) c.amber else c.hairline, RoundedCornerShape(14.dp))
                 .clickable {
                     tapKey++
                     onAdd(coords)
