@@ -1,5 +1,6 @@
 package com.nexapos.retail.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -36,4 +37,7 @@ data class Sale(
     val customerId: Long? = null,
     /** Customer name captured at sale time — survives the customer being deleted/renamed. */
     val customerName: String = "Walk-in",
+    /** Free-text remark captured at the till (delivery instructions, customer ref). */
+    @ColumnInfo(defaultValue = "")
+    val note: String = "",
 )
