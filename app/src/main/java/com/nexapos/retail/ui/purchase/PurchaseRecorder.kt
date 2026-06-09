@@ -28,6 +28,7 @@ suspend fun recordPurchaseFromDraft(
     status: String = "received",
     expectedDelivery: String = "",
     notes: String = "",
+    discountRupees: Int = 0,
 ): Long {
     val trimmedName = supplierName.trim()
     if (trimmedName.isBlank() || items.isEmpty()) return -1L
@@ -86,7 +87,12 @@ suspend fun recordPurchaseFromDraft(
             supplierName = trimmedName,
             createdAt = System.currentTimeMillis(),
             itemCount = items.sumOf { it.quantity },
-            totalCents = lines.sumOf { it.lineTotalCents },
+            totalCents =
+                run {
+                    val s = lines.sumOf { it.lineTotalCents }
+                    s - (discountRupees * CENTS_PER_RUPEE).coerceIn(0, s)
+                },
+            discountCents = (discountRupees * CENTS_PER_RUPEE).coerceIn(0, lines.sumOf { it.lineTotalCents }),
             paymentMethod = paymentMethod,
             status = status,
             expectedDelivery = expectedDelivery.trim(),

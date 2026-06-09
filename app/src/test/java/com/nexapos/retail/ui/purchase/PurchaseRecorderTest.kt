@@ -215,4 +215,40 @@ class PurchaseRecorderTest {
             // Two purchases recorded but supplier only upserted once (checked via Flow first() value)
             assertEquals(2, fakes.purchases.recorded.size)
         }
+
+    @Test
+    fun `applies supplier discount to the order total`() =
+        runTest {
+            val fakes = RecorderFakes()
+            recordPurchaseFromDraft(
+                purchasesRepository = fakes.purchases,
+                catalogRepository = fakes.catalog,
+                partiesRepository = fakes.parties,
+                supplierName = "ACME",
+                paymentMethod = "cash",
+                items = listOf(PurchaseDraftItem("Pipe", quantity = 10, unitCostRupees = 100)),
+                discountRupees = 150,
+            )
+            val recorded = fakes.purchases.recorded.single().first
+            assertEquals(150 * 100L, recorded.discountCents)
+            assertEquals((1000 - 150) * 100L, recorded.totalCents)
+        }
+
+    @Test
+    fun `discount is clamped to the subtotal`() =
+        runTest {
+            val fakes = RecorderFakes()
+            recordPurchaseFromDraft(
+                purchasesRepository = fakes.purchases,
+                catalogRepository = fakes.catalog,
+                partiesRepository = fakes.parties,
+                supplierName = "ACME",
+                paymentMethod = "cash",
+                items = listOf(PurchaseDraftItem("Pipe", quantity = 1, unitCostRupees = 100)),
+                discountRupees = 500,
+            )
+            val recorded = fakes.purchases.recorded.single().first
+            assertEquals(100 * 100L, recorded.discountCents)
+            assertEquals(0L, recorded.totalCents)
+        }
 }

@@ -106,6 +106,7 @@ class PurchasesViewModel(
         status: String = "received",
         expectedDelivery: String = "",
         notes: String = "",
+        discountRupees: Int = 0,
     ) {
         if (supplierName.isBlank() || items.isEmpty()) return
         viewModelScope.launch {
@@ -119,6 +120,7 @@ class PurchasesViewModel(
                 status,
                 expectedDelivery,
                 notes,
+                discountRupees,
             )
         }
     }
