@@ -122,8 +122,10 @@ fun PosSaleScreen(
     // Hardware barcode scanner: add the scanned product to the ticket. Mirrors the
     // camera Scan button; clears the search box if any burst chars leaked into it.
     val scanContext = androidx.compose.ui.platform.LocalContext.current
+    val arrangeNow = androidx.compose.runtime.rememberUpdatedState(arrangeMode)
     androidx.compose.runtime.LaunchedEffect(Unit) {
         com.nexapos.retail.data.barcode.ScannerEvents.scans.collect { code ->
+            if (arrangeNow.value) return@collect
             if (vm.addByBarcode(code)) {
                 query = ""
             } else {
@@ -195,6 +197,13 @@ fun PosSaleScreen(
                         SmallBtn(PosIcons.filter, if (arrangeMode) "Done" else "Arrange") {
                             arrangeMode = !arrangeMode
                             pickedId = null
+                            if (arrangeMode) {
+                                // Arrange the full catalog so a move lands exactly where it's tapped
+                                // (filters would hide tiles between the visible ones).
+                                selMain = null
+                                selSub = null
+                                query = ""
+                            }
                         }
                     }
 
