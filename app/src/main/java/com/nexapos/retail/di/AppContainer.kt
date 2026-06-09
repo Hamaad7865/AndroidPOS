@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.nexapos.retail.data.MIGRATION_6_7
 import com.nexapos.retail.data.MIGRATION_7_8
 import com.nexapos.retail.data.MIGRATION_8_9
+import com.nexapos.retail.data.MIGRATION_9_10
 import com.nexapos.retail.data.PosDatabase
 import com.nexapos.retail.data.repository.RoomCatalogRepository
 import com.nexapos.retail.data.repository.RoomMoneyRepository
@@ -43,7 +44,7 @@ class AppContainer(context: Context) {
             // No legacy data is in production yet, so v1 → v2 schema bumps (added Brand,
             // plus the extra Product columns) just recreate the DB. The user's flow already
             // includes a "Delete all data" path for the same purpose.
-            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 

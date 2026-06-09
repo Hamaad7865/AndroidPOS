@@ -1,5 +1,6 @@
 package com.nexapos.retail.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -26,6 +27,10 @@ data class Purchase(
     val createdAt: Long,
     val itemCount: Int,
     val totalCents: Long,
+    /** Flat Rs supplier discount on the order (minor units); totalCents is already net of it.
+     *  Declared with a SQL default so the v9→v10 migration matches Room's schema (no wipe). */
+    @ColumnInfo(defaultValue = "0")
+    val discountCents: Long = 0,
     val paymentMethod: String = "cash",
     /** received, partial, pending, cancelled. */
     val status: String = "received",
