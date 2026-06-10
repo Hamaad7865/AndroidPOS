@@ -113,6 +113,16 @@ object PinManager {
     }
 
     /**
+     * Counts a failed multi-staff login attempt toward the shared lockout.
+     * [StaffAuthenticator] verifies against per-staff hashes, so it can't use
+     * [verify] — but every wrong PIN must still feed the same brute-force gate.
+     */
+    fun noteFailedAttempt(context: Context) = recordFailure(context)
+
+    /** Clears the shared lockout after a successful multi-staff login. */
+    fun noteSuccess(context: Context) = clearLockout(context)
+
+    /**
      * Returns the number of milliseconds remaining in the current lockout,
      * or 0 if not locked.  The UI can poll this to display a countdown.
      */

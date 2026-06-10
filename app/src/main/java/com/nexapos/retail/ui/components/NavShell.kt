@@ -120,6 +120,9 @@ private fun BottomNav(
                 )
             }
         }
+        Spacer(Modifier.width(8.dp))
+        // Signed-in staff badge — tap to sign out / lock the till.
+        SessionSlot(onNav = onNav, compact = true)
         Spacer(Modifier.width(4.dp))
     }
 }

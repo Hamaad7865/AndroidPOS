@@ -33,11 +33,13 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.nexapos.retail.data.entity.MoneyTxn
 import com.nexapos.retail.data.entity.Sale
+import com.nexapos.retail.domain.StaffPolicy
 import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.NavShell
 import com.nexapos.retail.ui.components.PosIcon
 import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.components.rsStr
+import com.nexapos.retail.ui.session.rememberIsAdmin
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
 import java.text.SimpleDateFormat
@@ -75,25 +77,39 @@ fun ReportDetailScreen(
                 .padding(horizontal = 22.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            when (reportId) {
-                "sales" -> SalesReport(vm)
-                "purchase" -> PurchaseReport(vm)
-                "due" -> DueReport(vm)
-                "daybook", "all-tx" -> DayBookReport(vm)
-                "bill-profit" -> BillWiseProfitReport(vm)
-                "profit-loss" -> ProfitLossReport(vm)
-                "cashflow" -> CashflowReport(vm)
-                "tax" -> TaxReport(vm)
-                "income" -> IncomeReport(vm)
-                "income-categories" -> IncomeCategoriesReport(vm)
-                "expense" -> ExpenseReport(vm)
-                "product-sales" -> ProductSaleHistoryReport(vm)
-                "product-purchases" -> ProductPurchaseHistoryReport(vm)
-                "sales-return" -> SalesReturnReport(vm)
-                "purchase-return" -> ComingLater(reportId)
-                else -> NotFound()
+            // Defence in depth: the hub already hides these rows from cashiers,
+            // but the route is still reachable — never render profit data here.
+            val admin = rememberIsAdmin()
+            when {
+                !StaffPolicy.canSeeReport(admin, reportId) -> AdminOnly()
+                else -> ReportBody(reportId, vm)
             }
         }
+    }
+}
+
+@Composable
+private fun ReportBody(
+    reportId: String,
+    vm: ReportsViewModel,
+) {
+    when (reportId) {
+        "sales" -> SalesReport(vm)
+        "purchase" -> PurchaseReport(vm)
+        "due" -> DueReport(vm)
+        "daybook", "all-tx" -> DayBookReport(vm)
+        "bill-profit" -> BillWiseProfitReport(vm)
+        "profit-loss" -> ProfitLossReport(vm)
+        "cashflow" -> CashflowReport(vm)
+        "tax" -> TaxReport(vm)
+        "income" -> IncomeReport(vm)
+        "income-categories" -> IncomeCategoriesReport(vm)
+        "expense" -> ExpenseReport(vm)
+        "product-sales" -> ProductSaleHistoryReport(vm)
+        "product-purchases" -> ProductPurchaseHistoryReport(vm)
+        "sales-return" -> SalesReturnReport(vm)
+        "purchase-return" -> ComingLater(reportId)
+        else -> NotFound()
     }
 }
 
@@ -1246,6 +1262,28 @@ private fun ComingLater(id: String) {
 @Composable
 private fun NotFound() {
     EmptyCard("Report not found.")
+}
+
+/** Shown when a cashier reaches a profit/cost report by route. */
+@Composable
+private fun AdminOnly() {
+    val c = PosTheme.colors
+    Card {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(c.amberSoft),
+                contentAlignment = Alignment.Center,
+            ) { PosIcon(PosIcons.user, tint = c.amberPress, size = 22.dp) }
+            Column(Modifier.weight(1f)) {
+                Text("Admin only", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                Text(
+                    "This report shows cost and profit figures. Ask an admin to sign in to view it.",
+                    fontSize = 12.sp,
+                    color = c.muted,
+                )
+            }
+        }
+    }
 }
 
 // ===========================================================================

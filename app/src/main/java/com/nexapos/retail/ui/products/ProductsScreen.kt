@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.PosApplication
 import com.nexapos.retail.data.barcode.BarcodeScanner
 import com.nexapos.retail.data.barcode.Ean13
 import com.nexapos.retail.data.entity.VatType
@@ -71,6 +72,7 @@ import com.nexapos.retail.ui.components.formatNum
 import com.nexapos.retail.ui.sale.PosProduct
 import com.nexapos.retail.ui.sale.categoryLabel
 import com.nexapos.retail.ui.sale.matchesCategory
+import com.nexapos.retail.ui.session.rememberIsAdmin
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
@@ -110,6 +112,8 @@ fun ProductsListScreen(
 ) {
     val c = PosTheme.colors
     val context = LocalContext.current
+    // Cashiers never see cost data — gates the COST column and the CSV export.
+    val admin = rememberIsAdmin()
     var query by remember { mutableStateOf("") }
     var selMain by remember { mutableStateOf<String?>(null) }
     var selSub by remember { mutableStateOf<String?>(null) }
@@ -150,9 +154,12 @@ fun ProductsListScreen(
     val exportLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
             if (uri != null) {
+                // Read the role at write time (not capture time): cashier exports
+                // must not contain the cost column. Import only needs Name + Price.
+                val canSeeCost = (context.applicationContext as PosApplication).container.session.isAdmin
                 runCatching {
                     context.contentResolver.openOutputStream(uri)?.use { out ->
-                        out.write(productsCsv(vm.products).toByteArray(Charsets.UTF_8))
+                        out.write(productsCsv(vm.products, includeCost = canSeeCost).toByteArray(Charsets.UTF_8))
                     }
                 }.onSuccess {
                     Toast.makeText(context, "Exported ${vm.products.size} products", Toast.LENGTH_SHORT).show()
@@ -268,14 +275,14 @@ fun ProductsListScreen(
             Column(
                 Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)).background(c.raised).border(1.dp, c.hairline, RoundedCornerShape(14.dp)),
             ) {
-                TableHead()
+                TableHead(showCost = admin)
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                     if (rows.isEmpty()) {
                         EmptyRows(hasProducts = vm.products.isNotEmpty())
                     } else {
                         rows.forEach { p ->
                             val pid = p.id.toLongOrNull()
-                            TableRow(p) { if (pid != null) onOpenProduct(pid) }
+                            TableRow(p, showCost = admin) { if (pid != null) onOpenProduct(pid) }
                         }
                     }
                 }
@@ -302,7 +309,7 @@ fun ProductsListScreen(
 }
 
 @Composable
-private fun TableHead() {
+private fun TableHead(showCost: Boolean) {
     val c = PosTheme.colors
     Row(
         Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -312,7 +319,7 @@ private fun TableHead() {
         Spacer(Modifier.width(54.dp))
         HeadCell("PRODUCT", Modifier.weight(2f))
         HeadCell("CATEGORY", Modifier.weight(1f))
-        HeadCell("COST", Modifier.width(80.dp), TextAlign.End)
+        if (showCost) HeadCell("COST", Modifier.width(80.dp), TextAlign.End)
         HeadCell("PRICE", Modifier.width(80.dp), TextAlign.End)
         HeadCell("STOCK", Modifier.width(64.dp), TextAlign.End)
         HeadCell("VALUE", Modifier.width(96.dp), TextAlign.End)
@@ -332,6 +339,7 @@ private fun HeadCell(
 @Composable
 private fun TableRow(
     p: PosProduct,
+    showCost: Boolean,
     onOpen: () -> Unit,
 ) {
     val c = PosTheme.colors
@@ -357,7 +365,9 @@ private fun TableRow(
             Text(codeLine, fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(categoryLabel(p.mainCat, p.cat), Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(if (p.cost > 0) rs(p.cost) else "—", Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.graphite, textAlign = TextAlign.End)
+        if (showCost) {
+            Text(if (p.cost > 0) rs(p.cost) else "—", Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.graphite, textAlign = TextAlign.End)
+        }
         Text(rs(p.price), Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.End)
         Box(Modifier.width(64.dp), contentAlignment = Alignment.CenterEnd) { StockBadge(p.stock) }
         Text(rs(p.price * p.stock), Modifier.width(96.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End)
@@ -665,6 +675,9 @@ fun AddProductScreen(
     val priceRupees = price.filter { it.isDigit() }.toIntOrNull() ?: 0
     val costRupees = cost.filter { it.isDigit() }.toIntOrNull() ?: 0
     val canPublish = name.isNotBlank() && priceRupees > 0 && loaded
+    // Cashiers never see purchase price or margin; on save the loaded cost
+    // state passes through publish() unchanged, so hiding the field is safe.
+    val admin = rememberIsAdmin()
 
     fun publish() {
         if (!canPublish) return
@@ -888,18 +901,21 @@ fun AddProductScreen(
                             right = "Rs",
                             placeholder = "0",
                         )
-                        EditableField(
-                            "Purchase price",
-                            cost,
-                            { cost = it },
-                            Modifier.weight(1f),
-                            mono = true,
-                            number = true,
-                            right = "Rs",
-                            placeholder = "0",
-                        )
+                        if (admin) {
+                            EditableField(
+                                "Purchase price",
+                                cost,
+                                { cost = it },
+                                Modifier.weight(1f),
+                                mono = true,
+                                number = true,
+                                right = "Rs",
+                                placeholder = "0",
+                            )
+                        }
                     }
-                    if (priceRupees > 0 && costRupees > 0 && priceRupees > costRupees) {
+                    val hasMargin = priceRupees > 0 && costRupees > 0 && priceRupees > costRupees
+                    if (admin && hasMargin) {
                         Spacer(Modifier.height(8.dp))
                         val margin = priceRupees - costRupees
                         val marginPct = (margin * 100) / priceRupees

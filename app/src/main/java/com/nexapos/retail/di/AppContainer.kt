@@ -3,6 +3,7 @@ package com.nexapos.retail.di
 import android.content.Context
 import androidx.room.Room
 import com.nexapos.retail.data.MIGRATION_10_11
+import com.nexapos.retail.data.MIGRATION_11_12
 import com.nexapos.retail.data.MIGRATION_6_7
 import com.nexapos.retail.data.MIGRATION_7_8
 import com.nexapos.retail.data.MIGRATION_8_9
@@ -14,13 +15,16 @@ import com.nexapos.retail.data.repository.RoomPartiesRepository
 import com.nexapos.retail.data.repository.RoomPurchasesRepository
 import com.nexapos.retail.data.repository.RoomReturnsRepository
 import com.nexapos.retail.data.repository.RoomSalesRepository
+import com.nexapos.retail.data.repository.RoomStaffRepository
 import com.nexapos.retail.data.security.DbKeyManager
+import com.nexapos.retail.data.security.StaffSession
 import com.nexapos.retail.domain.repository.CatalogRepository
 import com.nexapos.retail.domain.repository.MoneyRepository
 import com.nexapos.retail.domain.repository.PartiesRepository
 import com.nexapos.retail.domain.repository.PurchasesRepository
 import com.nexapos.retail.domain.repository.ReturnsRepository
 import com.nexapos.retail.domain.repository.SalesRepository
+import com.nexapos.retail.domain.repository.StaffRepository
 import net.sqlcipher.database.SupportFactory
 
 /**
@@ -45,7 +49,7 @@ class AppContainer(context: Context) {
             // No legacy data is in production yet, so v1 → v2 schema bumps (added Brand,
             // plus the extra Product columns) just recreate the DB. The user's flow already
             // includes a "Delete all data" path for the same purpose.
-            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
@@ -72,6 +76,13 @@ class AppContainer(context: Context) {
     val returnsRepository: ReturnsRepository by lazy {
         RoomReturnsRepository(database.saleReturnDao(), database.productDao(), database.partyDao())
     }
+
+    val staffRepository: StaffRepository by lazy {
+        RoomStaffRepository(database.staffDao())
+    }
+
+    /** Who is signed in at this till. In-memory; cleared on every cold start. */
+    val session = StaffSession()
 
     /** Flushes the write-ahead log into the main DB file so a file copy is a complete backup. */
     fun checkpoint() {

@@ -1,6 +1,6 @@
 # NexaPOS Retail — Architecture
 
-> Status: living document. Last reviewed 2026-05-25.
+> Status: living document. Last reviewed 2026-06-10.
 
 ## 1. Requirements
 
@@ -8,7 +8,9 @@
 - Browse a product catalog grouped by category; search by name and scan/lookup by barcode.
 - Build a sale (cart): add item, change quantity, remove line, clear.
 - Checkout: choose payment method, record an immutable sale with its line items, produce a receipt.
-- (Roadmap) product/inventory management, sales history & reports, receipt printing, cashier accounts.
+- Staff sign-in with per-staff PINs and **ADMIN/CASHIER** roles; cashiers never see
+  cost, margin or profit data (`domain/StaffPolicy.kt`).
+- (Roadmap) product/inventory management, sales history & reports, receipt printing.
 
 ### Non-functional (NFRs)
 | NFR | Target | Driver |
@@ -18,7 +20,7 @@
 | **Latency** | Add-to-cart and checkout feel instant on low-end tablets | Cashier throughput |
 | **Durability** | Committed sales survive process death / power loss | It's a cash register |
 | **Maintainability** | One codebase sold to many shops; testable core | Commercial product |
-| **Security** | Local-only data today; cashier auth + roles later | Protect takings and price edits |
+| **Security** | Encrypted at rest (SQLCipher); per-staff PIN auth with admin/cashier roles | Protect takings and price edits |
 
 ### Constraints
 - Android-only (native), single device per till to start.
@@ -59,6 +61,12 @@ graph TD
     AppContainer["AppContainer (manual DI)"] -. builds .-> RCR
     AppContainer -. builds .-> RSR
 ```
+
+The diagram shows the sale path; the same interface/implementation split covers the
+other domains (`PartiesRepository`, `PurchasesRepository`, `MoneyRepository`,
+`ReturnsRepository`, `StaffRepository`, …). The signed-in staff member lives in an
+in-memory `StaffSession` (`StateFlow<Staff?>`) on the `AppContainer`, so every cold
+start lands on the login screen and the UI reacts to role changes.
 
 **Flow of a sale:** UI event → `SaleViewModel` mutates in-memory cart `StateFlow`
 → on checkout, builds a `Sale` + `SaleItem`s → `SalesRepository.recordSale`

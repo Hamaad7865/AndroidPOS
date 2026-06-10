@@ -23,10 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.domain.StaffPolicy
 import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.NavShell
 import com.nexapos.retail.ui.components.PosIcon
 import com.nexapos.retail.ui.components.PosIcons
+import com.nexapos.retail.ui.session.rememberIsAdmin
 import com.nexapos.retail.ui.theme.PosTheme
 
 /**
@@ -44,10 +46,11 @@ fun ReportsScreen(
     onOpenReport: (String) -> Unit,
 ) {
     val c = PosTheme.colors
+    val admin = rememberIsAdmin()
     NavShell(active = "reports", onNav = onNav) {
         AppBar(
             title = "Reports",
-            subtitle = "Sales, purchases, profit, tax and more",
+            subtitle = if (admin) "Sales, purchases, profit, tax and more" else "Sales, purchases, tax and more",
         )
         Column(
             Modifier
@@ -58,6 +61,9 @@ fun ReportsScreen(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             SECTIONS.forEach { section ->
+                // Cashiers never see profit/cost reports (StaffPolicy).
+                val items = section.items.filter { StaffPolicy.canSeeReport(admin, it.id) }
+                if (items.isEmpty()) return@forEach
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         section.title,
@@ -73,12 +79,12 @@ fun ReportsScreen(
                             .background(c.raised)
                             .border(1.dp, c.hairline, RoundedCornerShape(14.dp)),
                     ) {
-                        section.items.forEachIndexed { i, item ->
+                        items.forEachIndexed { i, item ->
                             ReportRow(
                                 item = item,
                                 onClick = { onOpenReport(item.id) },
                             )
-                            if (i < section.items.size - 1) {
+                            if (i < items.size - 1) {
                                 Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline2))
                             }
                         }

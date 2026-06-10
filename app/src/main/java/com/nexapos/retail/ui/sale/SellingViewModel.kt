@@ -223,6 +223,19 @@ class SellingViewModel(
     }
 
     /**
+     * Wipes ALL in-memory ticket state when the till is locked / a staff member
+     * signs out — the in-progress cart, every parked ticket, and the last-sale
+     * snapshot. The shared till is single-instance, so without this the next
+     * staff member would inherit the previous person's cart and held tickets.
+     */
+    fun resetForSignOut() {
+        startNewTicket()
+        heldTickets.clear()
+        lastSale = null
+        saleError = null
+    }
+
+    /**
      * Sets the discount from either a percentage of the subtotal or a flat Rs amount.
      * Stores the resulting flat [discount] (the source of truth for the total) and keeps
      * the cash tender in sync, mirroring direct edits to the field.

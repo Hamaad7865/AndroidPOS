@@ -68,7 +68,8 @@ not shown in the screenshots.
 - **Business Profile** (view/edit) 📷
 - **Printing / Invoice settings** + **Custom Print** template 📷
 - **Sales Settings** 📷
-- **User Role / Staff & permissions** 📷
+- **User Role / Staff & permissions** 📷 — ✅ shipped as **Settings → Staff & roles**
+  (per-staff PINs, ADMIN/CASHIER roles; cashiers never see cost/margin/profit)
 - **Currency** 📷 · **Language** 📷
 - **Subscription** management 📷
 - Delete account / Log out 📷
@@ -82,4 +83,4 @@ global search · (optional) notifications.
 - **Phase 2 — daily ops:** Sales List + Invoice detail → Parties + Due/Ledger → Home & Analytics Dashboard.
 - **Phase 3 — buying & cash:** Purchase + Purchase List → Stock List → Income/Expense → Cash & Bank.
 - **Phase 4 — accounting & compliance:** Reports suite → Sales/Purchase Returns → Vat & Tax → Barcode labels → Custom Print.
-- **Phase 5 — admin & polish:** User Roles → Subscription → Settings → final visual polish.
+- **Phase 5 — admin & polish:** User Roles (✅ done — Staff & roles) → Subscription → Settings → final visual polish.

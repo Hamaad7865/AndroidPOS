@@ -16,6 +16,7 @@ import com.nexapos.retail.ui.reports.ReportsViewModel
 import com.nexapos.retail.ui.sale.SaleReturnViewModel
 import com.nexapos.retail.ui.sale.SalesListViewModel
 import com.nexapos.retail.ui.sale.SellingViewModel
+import com.nexapos.retail.ui.settings.StaffViewModel
 
 /** Wires ViewModels to the app's [com.nexapos.retail.di.AppContainer]. */
 object AppViewModelProvider {
@@ -82,6 +83,10 @@ object AppViewModelProvider {
             }
             initializer {
                 PurchaseDetailViewModel(purchasesRepository = posApplication().container.purchasesRepository)
+            }
+            initializer {
+                val c = posApplication().container
+                StaffViewModel(staffRepository = c.staffRepository, session = c.session)
             }
             initializer {
                 val c = posApplication().container

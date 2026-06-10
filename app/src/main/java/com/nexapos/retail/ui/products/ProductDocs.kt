@@ -13,15 +13,22 @@ import com.nexapos.retail.ui.sale.PosProduct
 private const val MODULE_PX = 2
 private const val BAR_HEIGHT_PX = 46
 
-/** Builds an Excel-friendly CSV (CRLF lines, quoted cells) of the given products. */
-internal fun productsCsv(products: List<PosProduct>): String {
+/**
+ * Builds an Excel-friendly CSV (CRLF lines, quoted cells) of the given products.
+ * [includeCost] is false for cashier exports — they must not see cost prices.
+ * Import still round-trips either shape (only Name and Price are required).
+ */
+internal fun productsCsv(
+    products: List<PosProduct>,
+    includeCost: Boolean = true,
+): String {
     val header =
-        listOf(
+        listOfNotNull(
             "Name",
             "SKU",
             "Barcode",
             "Category",
-            "Cost (Rs)",
+            "Cost (Rs)".takeIf { includeCost },
             "Price (Rs)",
             "Stock",
             "Stock value (Rs)",
@@ -30,12 +37,12 @@ internal fun productsCsv(products: List<PosProduct>): String {
     sb.append(header.joinToString(",") { csvCell(it) }).append("\r\n")
     products.forEach { p ->
         val row =
-            listOf(
+            listOfNotNull(
                 p.name,
                 p.sku,
                 p.barcode.orEmpty(),
                 p.cat,
-                p.cost.toString(),
+                p.cost.toString().takeIf { includeCost },
                 p.price.toString(),
                 p.stock.toString(),
                 (p.price * p.stock).toString(),

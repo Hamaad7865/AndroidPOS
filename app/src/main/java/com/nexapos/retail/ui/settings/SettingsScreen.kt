@@ -39,9 +39,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.PosApplication
 import com.nexapos.retail.data.AppReset
 import com.nexapos.retail.data.backup.BackupManager
 import com.nexapos.retail.data.backup.BackupPrefs
+import com.nexapos.retail.data.entity.isAdmin
 import com.nexapos.retail.data.profile.BusinessProfile
 import com.nexapos.retail.data.security.DbKeyManager
 import com.nexapos.retail.data.security.PinManager
@@ -54,6 +56,7 @@ import com.nexapos.retail.ui.components.PosIcon
 import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.components.SecBtn
 import com.nexapos.retail.ui.components.WideBtn
+import com.nexapos.retail.ui.session.rememberIsAdmin
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
 import kotlinx.coroutines.Dispatchers
@@ -68,8 +71,14 @@ private data class SettingItem(val icon: List<String>, val label: String, val de
 
 private data class SettingGroup(val title: String, val items: List<SettingItem>)
 
-private fun groups() =
-    listOf(
+private fun groups(admin: Boolean) =
+    listOfNotNull(
+        SettingGroup(
+            "Staff",
+            listOf(
+                SettingItem(PosIcons.people, "Staff & roles", "Admins see profit · cashiers don't", "staff-settings"),
+            ),
+        ).takeIf { admin },
         SettingGroup(
             "Receipt & hardware",
             listOf(
@@ -90,6 +99,9 @@ private fun groups() =
 fun SettingsScreen(onNav: (String) -> Unit) {
     val c = PosTheme.colors
     val context = LocalContext.current
+    // Admins manage data (backup/restore/delete) and staff; cashiers only
+    // change their own PIN here.
+    val admin = rememberIsAdmin()
     var businessName by remember { mutableStateOf(BusinessProfile.name(context)) }
     var businessAddress by remember { mutableStateOf(BusinessProfile.address(context)) }
     var businessBrn by remember { mutableStateOf(BusinessProfile.brn(context)) }
@@ -204,9 +216,9 @@ fun SettingsScreen(onNav: (String) -> Unit) {
                     ThemePill(PosIcons.sun, "Daylight", true)
                     ThemePill(PosIcons.moon, "Counter Mode", false)
                 }
-                DataSecurityCard()
+                DataSecurityCard(admin = admin)
                 // groups
-                groups().forEach { g ->
+                groups(admin).forEach { g ->
                     Column(Modifier.fillMaxWidth()) {
                         Eyebrow(g.title)
                         Spacer(Modifier.height(10.dp))
@@ -218,27 +230,35 @@ fun SettingsScreen(onNav: (String) -> Unit) {
                         }
                     }
                 }
-                // danger zone
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.crimsonSoft.copy(alpha = 0.35f)).border(1.dp, c.crimsonSoft, RoundedCornerShape(14.dp)).padding(18.dp)) {
-                    Eyebrow("Danger zone")
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Delete business data", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink)
-                            Text("This will erase all sales, products, and reports for this shop. Cannot be undone.", fontSize = 12.sp, color = c.muted)
-                        }
-                        Row(
-                            Modifier.height(32.dp).clip(RoundedCornerShape(8.dp)).background(c.crimson)
-                                .clickable { showDeleteDialog = true }
-                                .padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            PosIcon(PosIcons.trash, tint = Color.White, size = 14.dp)
-                            Text("Delete", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                        }
-                    }
+                // danger zone — wiping the shop is an owner decision, never a cashier's
+                if (admin) {
+                    DangerZoneCard(onDelete = { showDeleteDialog = true })
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DangerZoneCard(onDelete: () -> Unit) {
+    val c = PosTheme.colors
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.crimsonSoft.copy(alpha = 0.35f)).border(1.dp, c.crimsonSoft, RoundedCornerShape(14.dp)).padding(18.dp)) {
+        Eyebrow("Danger zone")
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text("Delete business data", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                Text("This will erase all sales, products, and reports for this shop. Cannot be undone.", fontSize = 12.sp, color = c.muted)
+            }
+            Row(
+                Modifier.height(32.dp).clip(RoundedCornerShape(8.dp)).background(c.crimson)
+                    .clickable { onDelete() }
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PosIcon(PosIcons.trash, tint = Color.White, size = 14.dp)
+                Text("Delete", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             }
         }
     }
@@ -285,8 +305,13 @@ private fun SettingRow(
 
 private val whenFmt = SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.US)
 
+/**
+ * Data & security. Admins get the full toolkit — backup, restore, recovery key,
+ * delete lives just below. Cashiers only change their own sign-in PIN: restoring
+ * or backing up the encrypted DB is the owner's job, not the till operator's.
+ */
 @Composable
-private fun DataSecurityCard() {
+private fun DataSecurityCard(admin: Boolean) {
     val c = PosTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -340,36 +365,61 @@ private fun DataSecurityCard() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Eyebrow("Data & security")
-        Text("Backup & restore", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.ink)
-        Text(
-            if (lastAt > 0L) "Last backup: ${whenFmt.format(Date(lastAt))}" else "No backup yet. Backups are encrypted and saved to a folder you choose (USB/SD card or a Drive-synced folder).",
-            fontSize = 12.sp,
-            color = c.muted,
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WideBtn("Backup now", primary = true, Modifier.weight(1f), icon = PosIcons.download) { runBackup() }
-            WideBtn("Choose folder", primary = false, Modifier.weight(1f)) { folderPicker.launch(null) }
+        if (admin) {
+            Text("Backup & restore", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.ink)
+            Text(
+                if (lastAt > 0L) "Last backup: ${whenFmt.format(Date(lastAt))}" else "No backup yet. Backups are encrypted and saved to a folder you choose (USB/SD card or a Drive-synced folder).",
+                fontSize = 12.sp,
+                color = c.muted,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WideBtn("Backup now", primary = true, Modifier.weight(1f), icon = PosIcons.download) { runBackup() }
+                WideBtn("Choose folder", primary = false, Modifier.weight(1f)) { folderPicker.launch(null) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WideBtn("Restore…", primary = false, Modifier.weight(1f)) { restorePicker.launch(arrayOf("*/*")) }
+                WideBtn("Change PIN", primary = false, Modifier.weight(1f)) { showPin = true }
+            }
+            WideBtn("Show recovery key", primary = false, Modifier.fillMaxWidth()) { showKeyPinGate = true }
+        } else {
+            Text("Your PIN", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.ink)
+            Text(
+                "Change the PIN you sign in with. Backups, restore and data deletion are managed by an admin.",
+                fontSize = 12.sp,
+                color = c.muted,
+            )
+            WideBtn("Change PIN", primary = false, Modifier.fillMaxWidth()) { showPin = true }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WideBtn("Restore…", primary = false, Modifier.weight(1f)) { restorePicker.launch(arrayOf("*/*")) }
-            WideBtn("Change PIN", primary = false, Modifier.weight(1f)) { showPin = true }
-        }
-        WideBtn("Show recovery key", primary = false, Modifier.fillMaxWidth()) { showKeyPinGate = true }
         message?.let { Text(it, fontSize = 12.sp, color = c.emerald) }
     }
 
+    val container = (context.applicationContext as PosApplication).container
     if (showPin) {
         ChangePinDialog(
             onDismiss = { showPin = false },
             onSave = { pin ->
-                PinManager.setPin(context, pin)
-                showPin = false
-                message = "PIN updated."
+                scope.launch {
+                    val staff = container.session.current.value
+                    message =
+                        try {
+                            if (staff != null) {
+                                // Signed-in staff change their own PIN (uniqueness enforced).
+                                withContext(Dispatchers.Default) { container.staffRepository.setPin(staff.id, pin) }
+                            } else {
+                                PinManager.setPin(context, pin)
+                            }
+                            "PIN updated."
+                        } catch (e: IllegalArgumentException) {
+                            e.message
+                        }
+                    showPin = false
+                }
             },
         )
     }
 
-    // Recovery key: require PIN re-entry before revealing the passphrase.
+    // Recovery key: require an ADMIN PIN before revealing the passphrase —
+    // it decrypts the whole database, so cashier PINs must not open it.
     if (showKeyPinGate) {
         VerifyPinDialog(
             onDismiss = { showKeyPinGate = false },
@@ -377,13 +427,14 @@ private fun DataSecurityCard() {
                 scope.launch {
                     val ok =
                         withContext(Dispatchers.Default) {
-                            PinManager.verify(context, enteredPin)
+                            val staff = container.staffRepository.findByPin(enteredPin)
+                            if (staff != null) staff.isAdmin() else PinManager.verify(context, enteredPin)
                         }
                     if (ok) {
                         showKeyPinGate = false
                         showKey = true
                     } else {
-                        message = "Incorrect PIN."
+                        message = "Incorrect PIN — an admin PIN is required."
                         showKeyPinGate = false
                     }
                 }
@@ -425,7 +476,7 @@ private fun VerifyPinDialog(
         title = { Text("Confirm your PIN") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Enter your current PIN to reveal the recovery key.", fontSize = 13.sp)
+                Text("Enter an admin PIN to reveal the recovery key.", fontSize = 13.sp)
                 EditableField("Current PIN", pin, { pin = it }, Modifier.fillMaxWidth(), mono = true, number = true, placeholder = "····")
             }
         },

@@ -35,12 +35,24 @@ ktlint + detekt all green).
   file header), so an encrypted backup can be restored onto another device by
   entering the **recovery key** (Settings → Data & security → Show recovery key).
 
-### 3. Local PIN login (no cloud auth)
-- Login now requires a **staff PIN**, verified locally.
-- The PIN is stored only as a **PBKDF2(HMAC-SHA256, 120k iterations) + random salt**
-  hash in the Keystore-backed store — never in clear text.
-- **Default PIN on a fresh install is `1234`** — change it in
-  Settings → Data & security → **Change PIN**.
+### 3. Local staff PIN login with roles (no cloud auth)
+- Login requires a **staff PIN**, verified locally. The PIN alone identifies the
+  staff member (no name picker), so PINs are unique across active staff.
+- PINs are stored only as **PBKDF2(HMAC-SHA256, 120k iterations) + per-staff
+  random salt** hashes in the encrypted DB (`staff` table, schema v12) — never in
+  clear text. Failed attempts feed a shared brute-force lockout.
+- **Two roles**: **ADMIN** sees everything; **CASHIER** runs the till but never
+  sees cost, margin or profit — the profit reports (Bill-wise Profit, Profit &
+  Loss, Product Purchase History), the product COST column, the cost/margin
+  fields on Add/Edit Product, and the cost column in the CSV export are all
+  hidden. The rules live in `domain/StaffPolicy.kt` (pure JVM, unit-tested).
+- **Settings → Staff & roles** (admin-only): add cashiers/admins, rename, change
+  role, reset a PIN, deactivate (deactivated staff keep their sales history but
+  can't sign in). The repository enforces PIN uniqueness and refuses to demote
+  or deactivate the **last active admin**.
+- **No default PIN**: the first-run wizard creates the **Owner (admin)** from the
+  PIN you choose. A pre-roles install keeps signing in with its legacy shop PIN,
+  which is promoted to the Owner admin record on first login.
 
 ### 4. Backup & restore (free, offline)
 - **Backup** writes an encrypted copy of the database to a folder **you choose**
@@ -61,7 +73,8 @@ ktlint + detekt all green).
 ---
 
 ## How to test it (quick tour)
-1. **Login**: enter PIN **`1234`** → Sign in.
+1. **Login**: enter your **staff PIN** → Sign in (the first-run wizard sets the
+   Owner/admin PIN).
 2. **Sell**: POS → tap products → **Charge** → keypad → **Complete sale** → receipt.
    Re-open POS: the sold item's stock is lower. Dashboard "Today's sales" went up.
 3. **Add a product** (Products → Add product): tap the photo box to pick an image,
@@ -71,7 +84,9 @@ ktlint + detekt all green).
 6. **Record a purchase** (Purchases → New purchase → Confirm) → stock goes up.
 7. **Encryption**: data survives a full app close/reopen; the DB file on disk is not
    readable as plain SQLite.
-8. **Backup** (Settings → Data & security): Choose folder → Backup now. Then try
+8. **Roles** (Settings → Staff & roles, admin only): add a cashier, sign out and
+   sign in with the cashier's PIN — profit reports and cost prices disappear.
+9. **Backup** (Settings → Data & security): Choose folder → Backup now. Then try
    Restore.
 
 ---
@@ -112,7 +127,8 @@ Or copy `app-debug.apk` to the tablet and tap it (enable "Install unknown apps")
 - First launch seeds demo data so screens aren't empty — you can delete it later via
   Settings → Danger zone (wiring of the delete button is a follow-up; for now a clean
   start = reinstall).
-- Change the PIN from `1234` immediately (Settings → Data & security → Change PIN).
+- The first-run wizard sets the **Owner (admin) PIN** — there is no default PIN.
+  Give each till worker their own **cashier PIN** (Settings → Staff & roles).
 - Set a **backup folder** (a USB stick, SD card, or a folder the Google Drive app
   syncs) and write down the **recovery key**.
 
@@ -128,10 +144,9 @@ Or copy `app-debug.apk` to the tablet and tap it (enable "Install unknown apps")
   aggregates is a follow-up.
 - **Product photos** show on the Add-Product screen; showing them as thumbnails in the
   product list / POS tiles needs an image cache for smooth scrolling (follow-up).
-- **Single shop PIN** for now (per-staff PINs/roles later).
-- **Schema migrations**: during Phase 5 the schema is at version 1 and a first real
-  deploy should be a clean install. Add Room migrations before shipping updates that
-  change the schema to existing installs.
+- **Schema migrations**: the schema is now at **version 12** with additive Room
+  migrations (latest: v11→v12 adds the `staff` table), so updates install over
+  existing data without loss.
 - **Multi-counter LAN sync** is deliberately deferred (post-Phase-5).
 - **Test the restore flow** end-to-end on your device before relying on it.
 

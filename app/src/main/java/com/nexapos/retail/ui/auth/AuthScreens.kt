@@ -44,6 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.PosApplication
+import com.nexapos.retail.data.entity.StaffRole
 import com.nexapos.retail.data.profile.BusinessProfile
 import com.nexapos.retail.data.security.PinManager
 import com.nexapos.retail.ui.components.EditableField
@@ -54,8 +56,10 @@ import com.nexapos.retail.ui.components.WideBtn
 import com.nexapos.retail.ui.components.isPortrait
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val Bone = Color(0xFFF4ECDD)
 
@@ -308,11 +312,29 @@ fun BusinessSetupScreen(
     // PIN is required: blank is no longer allowed.
     val pinOk = pinValid && pin == confirmPin
     val canSave = name.isNotBlank() && pinOk
+    val scope = rememberCoroutineScope()
 
     fun save() {
         BusinessProfile.setProfile(context, name, address, brn, vat)
         PinManager.setPin(context, pin.trim())
-        onDone()
+        // The person doing first-run setup is the owner: record them as the
+        // shop's admin so roles work from the very first sign-in.
+        val container = (context.applicationContext as PosApplication).container
+        scope.launch {
+            val owner =
+                withContext(Dispatchers.Default) {
+                    val repo = container.staffRepository
+                    if (repo.activeStaff().isEmpty()) {
+                        repo.addStaff(name = "Owner", pin = pin.trim(), role = StaffRole.ADMIN)
+                    } else {
+                        // Setup re-ran on a shop that already has staff: don't create
+                        // a duplicate owner — sign in whoever this PIN belongs to.
+                        repo.findByPin(pin.trim())
+                    }
+                }
+            if (owner != null) container.session.login(owner)
+            onDone()
+        }
     }
 
     Row(Modifier.fillMaxSize().background(c.bg).systemBarsPadding()) {
@@ -469,7 +491,7 @@ fun BusinessSetupScreen(
                         Spacer(Modifier.height(6.dp))
                         SetupNote("Tickets start at S-00010 and increment by one per completed sale.")
                         Spacer(Modifier.height(6.dp))
-                        SetupNote("Your PIN is set above. Change it any time in Settings → Data & security.")
+                        SetupNote("Your PIN signs you in as the admin. Add cashiers in Settings → Staff & roles.")
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         WideBtn("‹ Back", primary = false, Modifier.width(120.dp), onClick = onBack)

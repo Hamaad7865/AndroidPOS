@@ -12,6 +12,7 @@ import com.nexapos.retail.data.dao.ProductDao
 import com.nexapos.retail.data.dao.PurchaseDao
 import com.nexapos.retail.data.dao.SaleDao
 import com.nexapos.retail.data.dao.SaleReturnDao
+import com.nexapos.retail.data.dao.StaffDao
 import com.nexapos.retail.data.entity.Brand
 import com.nexapos.retail.data.entity.Category
 import com.nexapos.retail.data.entity.MoneyTxn
@@ -23,6 +24,7 @@ import com.nexapos.retail.data.entity.Sale
 import com.nexapos.retail.data.entity.SaleItem
 import com.nexapos.retail.data.entity.SaleReturn
 import com.nexapos.retail.data.entity.SaleReturnItem
+import com.nexapos.retail.data.entity.Staff
 
 @Database(
     entities = [
@@ -37,6 +39,7 @@ import com.nexapos.retail.data.entity.SaleReturnItem
         PurchaseItem::class,
         SaleReturn::class,
         SaleReturnItem::class,
+        Staff::class,
     ],
     // v5: added unique index on sales.receiptNo; invoice seq now derived in-txn from MAX(receiptNo).
     // v6: purchases gained expectedDelivery + notes columns.
@@ -45,7 +48,8 @@ import com.nexapos.retail.data.entity.SaleReturnItem
     // v9: categories gained a parentId column for sub-categories (additive, non-destructive MIGRATION_8_9).
     // v10: purchases gained a discountCents column (additive, non-destructive MIGRATION_9_10).
     // v11: sales gained a note column (additive, non-destructive MIGRATION_10_11).
-    version = 11,
+    // v12: new staff table for per-staff PINs and roles (additive MIGRATION_11_12).
+    version = 12,
     exportSchema = true,
 )
 abstract class PosDatabase : RoomDatabase() {
@@ -64,6 +68,8 @@ abstract class PosDatabase : RoomDatabase() {
     abstract fun moneyTxnDao(): MoneyTxnDao
 
     abstract fun purchaseDao(): PurchaseDao
+
+    abstract fun staffDao(): StaffDao
 }
 
 /** v6→v7: add products.vatType, defaulting existing rows to STANDARD (unchanged 15% behaviour). */
@@ -103,5 +109,26 @@ val MIGRATION_10_11 =
     object : Migration(10, 11) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE sales ADD COLUMN note TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
+/**
+ * v11→v12: new staff table (per-staff PINs + admin/cashier roles). Existing
+ * installs keep signing in with the legacy shop PIN until first login, when
+ * StaffAuthenticator promotes the owner to an admin row here.
+ */
+val MIGRATION_11_12 =
+    object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `staff` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`pinHash` TEXT NOT NULL, " +
+                    "`pinSalt` TEXT NOT NULL, " +
+                    "`role` TEXT NOT NULL, " +
+                    "`active` INTEGER NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL)",
+            )
         }
     }

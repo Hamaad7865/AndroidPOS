@@ -21,11 +21,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.data.entity.isAdmin
+import com.nexapos.retail.ui.session.currentStaff
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
@@ -263,16 +269,86 @@ fun NavRail(
             }
         }
         Spacer(Modifier.height(8.dp))
-        // Bottom slot — cashier avatar will go here once per-staff sign-in is wired.
-        Box(
-            Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(c.raised2)
-                .border(1.dp, c.hairline, RoundedCornerShape(12.dp))
-                .semantics { contentDescription = "Cashier account" },
-            contentAlignment = Alignment.Center,
-        ) {
+        // Bottom slot — the signed-in staff member. Tap to lock the till / sign out.
+        SessionSlot(onNav = onNav)
+    }
+}
+
+/**
+ * The signed-in staff badge at the bottom of the nav rail (and the end of the
+ * portrait bottom bar). Shows the staff member's initial — amber-ringed for
+ * admins — and opens a sign-out dialog. "Sign out" routes through the special
+ * "lock" id, which PosApp turns into session.logout() + a clean trip to login.
+ */
+@Composable
+fun SessionSlot(
+    onNav: (String) -> Unit,
+    compact: Boolean = false,
+) {
+    val c = PosTheme.colors
+    val staff = currentStaff()
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDialog = false
+                        onNav("lock")
+                    },
+                ) { Text(if (staff != null) "Sign out · lock till" else "Go to sign-in") }
+            },
+            dismissButton = { TextButton(onClick = { showDialog = false }) { Text("Cancel") } },
+            title = { Text(if (staff != null) "Signed in as ${staff.name}" else "Not signed in") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (staff != null) {
+                        Text(
+                            if (staff.isAdmin()) "Role: Admin — full access, including profit and cost data." else "Role: Cashier — selling and stock, no profit or cost data.",
+                            fontSize = 13.sp,
+                        )
+                        Text(
+                            "Signing out locks the till. The next staff member signs in with their own PIN.",
+                            fontSize = 12.sp,
+                            color = c.muted,
+                        )
+                    } else {
+                        Text("Lock the till and sign in with a staff PIN.", fontSize = 13.sp)
+                    }
+                }
+            },
+        )
+    }
+
+    val initial = staff?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString()
+    val ring = if (staff?.isAdmin() == true) c.amber else c.hairline
+    val description =
+        when {
+            staff == null -> "Not signed in"
+            staff.isAdmin() -> "Signed in as ${staff.name}, admin. Tap to sign out."
+            else -> "Signed in as ${staff.name}, cashier. Tap to sign out."
+        }
+    Box(
+        Modifier
+            .size(if (compact) 36.dp else 44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(c.raised2)
+            .border(if (staff?.isAdmin() == true) 1.5.dp else 1.dp, ring, RoundedCornerShape(12.dp))
+            .semantics { contentDescription = description }
+            .clickable { showDialog = true },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (initial != null) {
+            Text(
+                initial,
+                fontFamily = JetBrainsMono,
+                fontSize = if (compact) 14.sp else 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = c.ink,
+            )
+        } else {
             PosIcon(PosIcons.people, tint = c.muted, size = 18.dp)
         }
     }

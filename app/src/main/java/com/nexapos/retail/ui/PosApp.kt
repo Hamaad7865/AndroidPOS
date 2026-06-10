@@ -1,14 +1,17 @@
 package com.nexapos.retail.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.nexapos.retail.PosApplication
 import com.nexapos.retail.data.profile.BusinessProfile
 import com.nexapos.retail.data.security.PinManager
+import com.nexapos.retail.data.security.StaffAuthenticator
 import com.nexapos.retail.ui.auth.BusinessSetupScreen
 import com.nexapos.retail.ui.auth.LoginScreen
 import com.nexapos.retail.ui.auth.SplashScreen
@@ -68,16 +71,30 @@ fun PosApp() {
     // Wrapped in remember so its identity is stable across recompositions and does
     // not cause the entire nav graph to rebuild.
     val go: (String) -> Unit =
-        remember(navController) {
+        remember(navController, appContext, selling) {
             { id ->
-                if (id in MODULE_ROUTES) {
-                    navController.navigate(id) {
-                        launchSingleTop = true
-                        popUpTo("home") { saveState = true }
-                        restoreState = true
+                when {
+                    // "lock" is the sign-out action (nav-rail session badge), not a
+                    // screen: drop the session, wipe the in-memory ticket so the next
+                    // staff member starts clean, and land on login with a clean stack
+                    // so Back can't walk into another staff member's session.
+                    id == "lock" -> {
+                        selling.resetForSignOut()
+                        (appContext.applicationContext as PosApplication).container.session.logout()
+                        navController.navigate("login") {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
                     }
-                } else {
-                    navController.navigate(id) { launchSingleTop = true }
+                    id in MODULE_ROUTES -> {
+                        navController.navigate(id) {
+                            launchSingleTop = true
+                            popUpTo("home") { saveState = true }
+                            restoreState = true
+                        }
+                    }
+                    else -> {
+                        navController.navigate(id) { launchSingleTop = true }
+                    }
                 }
             }
         }
@@ -117,12 +134,18 @@ fun PosApp() {
         }
         composable("login") {
             val context = LocalContext.current
+            val container = (context.applicationContext as PosApplication).container
+            // The login screen IS the lock screen: however we got here, no one
+            // is signed in any more.
+            LaunchedEffect(Unit) { container.session.logout() }
             LoginScreen(
                 verifyPin = { pin ->
                     // PBKDF2 is CPU-heavy — keep it off the main thread so the UI
                     // never freezes on a slow tablet.
                     withContext(Dispatchers.Default) {
-                        PinManager.verify(context, pin)
+                        val staff = StaffAuthenticator.authenticate(context, container.staffRepository, pin)
+                        if (staff != null) container.session.login(staff)
+                        staff != null
                     }
                 },
                 lockoutRemainingMs = { PinManager.lockoutRemainingMs(context) },
@@ -314,6 +337,13 @@ fun PosApp() {
         }
         composable("scanner-settings") {
             com.nexapos.retail.ui.settings.ScannerSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("staff-settings") {
+            com.nexapos.retail.ui.settings.StaffScreen(
+                vm = viewModel(factory = AppViewModelProvider.Factory),
+                onNav = go,
+                onBack = { navController.popBackStack() },
+            )
         }
         composable("setup") {
             BusinessSetupScreen(onDone = finishSetup, onBack = { navController.popBackStack() })
