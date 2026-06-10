@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.nexapos.retail.ui.components.EditableField
 import com.nexapos.retail.ui.components.rsStr
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 
 /**
  * Close-shift confirmation: the cashier counts the drawer and types what's
@@ -27,22 +28,22 @@ import com.nexapos.retail.ui.theme.PosTheme
  */
 @Composable
 fun ShiftCloseDialog(
-    expectedRupees: Int,
+    expectedCents: Long,
     onDismiss: () -> Unit,
-    onConfirm: (countedRupees: Int, note: String) -> Unit,
+    onConfirm: (countedCents: Long, note: String) -> Unit,
 ) {
     val c = PosTheme.colors
     var counted by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    val countedRupees = counted.filter { it.isDigit() }.toIntOrNull()
-    val overShort = countedRupees?.minus(expectedRupees)
+    val countedCents = Money.parseToCents(counted)
+    val overShort = countedCents?.minus(expectedCents)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(countedRupees ?: 0, note.trim()) },
-                enabled = countedRupees != null,
+                onClick = { onConfirm(countedCents ?: 0L, note.trim()) },
+                enabled = countedCents != null,
             ) { Text("Close shift") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
@@ -51,7 +52,7 @@ fun ShiftCloseDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     "Count ALL cash in the drawer (including the float) and enter the total. " +
-                        "Expected: ${rsStr(expectedRupees)}.",
+                        "Expected: ${rsStr(expectedCents)}.",
                     fontSize = 13.sp,
                 )
                 EditableField(
@@ -61,13 +62,13 @@ fun ShiftCloseDialog(
                     Modifier.fillMaxWidth(),
                     mono = true,
                     number = true,
-                    placeholder = expectedRupees.toString(),
+                    placeholder = Money.toInput(expectedCents),
                 )
                 overShort?.let { os ->
                     val (label, color) =
                         when {
-                            os > 0 -> "Over by ${rsStr(os)}" to c.emerald
-                            os < 0 -> "Short by ${rsStr(-os)}" to c.crimson
+                            os > 0L -> "Over by ${rsStr(os)}" to c.emerald
+                            os < 0L -> "Short by ${rsStr(-os)}" to c.crimson
                             else -> "Balanced — drawer matches exactly." to c.emerald
                         }
                     Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)

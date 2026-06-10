@@ -148,7 +148,7 @@ private fun HistoryRow(
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                "Float ${rsStr(centsToRupees(shift.openingFloatCents))}",
+                "Float ${rsStr(shift.openingFloatCents)}",
                 fontFamily = JetBrainsMono,
                 fontSize = 12.sp,
                 color = c.muted,
@@ -159,8 +159,8 @@ private fun HistoryRow(
                 val os = declared - expected
                 val label =
                     when {
-                        os > 0 -> "Over ${rsStr(centsToRupees(os))}"
-                        os < 0 -> "Short ${rsStr(centsToRupees(-os))}"
+                        os > 0L -> "Over ${rsStr(os)}"
+                        os < 0L -> "Short ${rsStr(-os)}"
                         else -> "Balanced"
                     }
                 Text(

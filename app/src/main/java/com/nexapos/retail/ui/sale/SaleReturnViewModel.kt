@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 data class ReturnLine(
     val productId: Long?,
     val name: String,
-    val unitPriceRupees: Int,
+    val unitPriceCents: Long,
     /** How many can still be returned (sold qty minus already-returned). */
     val maxReturnable: Int,
 )
@@ -99,21 +99,18 @@ class SaleReturnViewModel(
                 items.map { item ->
                     val key = item.productId?.toString() ?: item.nameSnapshot
                     val already = returnedByKey[key] ?: 0
+                    // Refund the NET unit price (after the line's discount), not the gross,
+                    // so a discounted line is never over-refunded.
+                    val netUnitCents =
+                        if (item.quantity > 0) {
+                            (item.lineTotalCents - item.discountCents) / item.quantity
+                        } else {
+                            item.unitPriceCents
+                        }
                     ReturnLine(
                         productId = item.productId,
                         name = item.nameSnapshot,
-                        unitPriceRupees =
-                            run {
-                                // Refund the NET unit price (after the line's discount), not the gross,
-                                // so a discounted line is never over-refunded.
-                                val netUnitCents =
-                                    if (item.quantity > 0) {
-                                        (item.lineTotalCents - item.discountCents) / item.quantity
-                                    } else {
-                                        item.unitPriceCents
-                                    }
-                                (netUnitCents / CENTS_PER_RUPEE).toInt()
-                            },
+                        unitPriceCents = netUnitCents,
                         maxReturnable = (item.quantity - already).coerceAtLeast(0),
                     )
                 }
@@ -137,9 +134,9 @@ class SaleReturnViewModel(
 
     fun decrement(index: Int) = setQty(index, (chosen[index] ?: 0) - 1)
 
-    /** Total refund in whole rupees. */
-    val refundRupees: Int
-        get() = lines.indices.sumOf { i -> (chosen[i] ?: 0) * (lines[i].unitPriceRupees) }
+    /** Total refund in cents. */
+    val refundCents: Long
+        get() = lines.indices.sumOf { i -> (chosen[i] ?: 0) * lines[i].unitPriceCents }
 
     val totalReturnUnits: Int get() = chosen.values.sum()
 
@@ -154,7 +151,7 @@ class SaleReturnViewModel(
                 if (q > 0) lines[i] to q else null
             }
         if (picked.isEmpty()) return
-        val totalCents = picked.sumOf { (line, q) -> line.unitPriceRupees.toLong() * q * CENTS_PER_RUPEE }
+        val totalCents = picked.sumOf { (line, q) -> line.unitPriceCents * q }
         viewModelScope.launch {
             val code = "RET-%04d".format(RETURN_CODE_BASE + returnsRepository.count())
             val saleReturn =
@@ -176,9 +173,9 @@ class SaleReturnViewModel(
                         returnId = 0,
                         productId = line.productId,
                         nameSnapshot = line.name,
-                        unitPriceCents = line.unitPriceRupees.toLong() * CENTS_PER_RUPEE,
+                        unitPriceCents = line.unitPriceCents,
                         quantity = q,
-                        lineTotalCents = line.unitPriceRupees.toLong() * q * CENTS_PER_RUPEE,
+                        lineTotalCents = line.unitPriceCents * q,
                     )
                 }
             returnsRepository.recordReturn(saleReturn, items)

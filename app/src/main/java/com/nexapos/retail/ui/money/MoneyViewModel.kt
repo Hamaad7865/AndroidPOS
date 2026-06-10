@@ -27,18 +27,18 @@ data class LedgerLine(
     val type: String,
     val description: String,
     val account: String,
-    val inRupees: Int,
-    val outRupees: Int,
-    val balanceRupees: Int,
+    val inCents: Long,
+    val outCents: Long,
+    val balanceCents: Long,
 )
 
 /** Per-account cash rollup from manual income/expense entries. */
 data class AccountSummary(
     val name: String,
-    val inRupees: Int,
-    val outRupees: Int,
+    val inCents: Long,
+    val outCents: Long,
 ) {
-    val netRupees: Int get() = inRupees - outRupees
+    val netCents: Long get() = inCents - outCents
 }
 
 /**
@@ -113,9 +113,9 @@ class MoneyViewModel(
                         type = "sale",
                         description = "Sale · ${s.customerName.ifBlank { "Walk-in" }}",
                         account = s.paymentMethod.lowercase().replaceFirstChar { it.uppercase() },
-                        inRupees = (s.totalCents / CENTS_PER_RUPEE).toInt(),
-                        outRupees = 0,
-                        balanceRupees = 0,
+                        inCents = s.totalCents,
+                        outCents = 0L,
+                        balanceCents = 0L,
                     )
             }
             incomes.forEach { t ->
@@ -126,9 +126,9 @@ class MoneyViewModel(
                         type = "income",
                         description = t.description.ifBlank { t.category }.ifBlank { "Income" },
                         account = t.account.ifBlank { "Unassigned" },
-                        inRupees = (t.amountCents / CENTS_PER_RUPEE).toInt(),
-                        outRupees = 0,
-                        balanceRupees = 0,
+                        inCents = t.amountCents,
+                        outCents = 0L,
+                        balanceCents = 0L,
                     )
             }
             expenses.forEach { t ->
@@ -139,16 +139,16 @@ class MoneyViewModel(
                         type = "expense",
                         description = t.description.ifBlank { t.category }.ifBlank { "Expense" },
                         account = t.account.ifBlank { "Unassigned" },
-                        inRupees = 0,
-                        outRupees = (t.amountCents / CENTS_PER_RUPEE).toInt(),
-                        balanceRupees = 0,
+                        inCents = 0L,
+                        outCents = t.amountCents,
+                        balanceCents = 0L,
                     )
             }
-            var balance = 0
+            var balance = 0L
             val ascendingWithBalance =
                 lines.sortedBy { it.createdAt }.map { line ->
-                    balance += line.inRupees - line.outRupees
-                    line.copy(balanceRupees = balance)
+                    balance += line.inCents - line.outCents
+                    line.copy(balanceCents = balance)
                 }
             return ascendingWithBalance.asReversed()
         }
@@ -156,31 +156,31 @@ class MoneyViewModel(
     /** Per-account rollup from manual entries (walk-in sales aren't tied to an account). */
     val accounts: List<AccountSummary>
         get() {
-            val buckets = LinkedHashMap<String, IntArray>() // name -> [in, out]
+            val buckets = LinkedHashMap<String, LongArray>() // name -> [in, out]
 
-            fun bucket(name: String) = buckets.getOrPut(name.ifBlank { "Unassigned" }) { intArrayOf(0, 0) }
-            incomes.forEach { bucket(it.account)[0] += (it.amountCents / CENTS_PER_RUPEE).toInt() }
-            expenses.forEach { bucket(it.account)[1] += (it.amountCents / CENTS_PER_RUPEE).toInt() }
+            fun bucket(name: String) = buckets.getOrPut(name.ifBlank { "Unassigned" }) { longArrayOf(0L, 0L) }
+            incomes.forEach { bucket(it.account)[0] += it.amountCents }
+            expenses.forEach { bucket(it.account)[1] += it.amountCents }
             return buckets
                 .map { (name, io) -> AccountSummary(name, io[0], io[1]) }
-                .sortedByDescending { it.inRupees + it.outRupees }
+                .sortedByDescending { it.inCents + it.outCents }
         }
 
     fun addTxn(
         income: Boolean,
         category: String,
         description: String,
-        amountRupees: Int,
+        amountCents: Long,
         account: String,
     ) {
-        if (amountRupees <= 0) return
+        if (amountCents <= 0L) return
         viewModelScope.launch {
             moneyRepository.add(
                 MoneyTxn(
                     type = if (income) MoneyTxn.TYPE_INCOME else MoneyTxn.TYPE_EXPENSE,
                     category = category,
                     description = description.trim(),
-                    amountCents = amountRupees * CENTS_PER_RUPEE,
+                    amountCents = amountCents,
                     account = account,
                     createdBy = session.current.value?.name.orEmpty(),
                     createdAt = System.currentTimeMillis(),

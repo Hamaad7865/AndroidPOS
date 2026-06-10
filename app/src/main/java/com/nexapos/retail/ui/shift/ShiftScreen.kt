@@ -45,15 +45,13 @@ import com.nexapos.retail.ui.reports.ExportButtons
 import com.nexapos.retail.ui.session.currentStaff
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private val openedFmt = SimpleDateFormat("HH:mm", Locale.US)
-private const val CENTS_PER_RUPEE = 100L
-
-internal fun centsToRupees(cents: Long): Int = (cents / CENTS_PER_RUPEE).toInt()
 
 /**
  * The till-shift hub. Three states: no shift (open form with float entry),
@@ -74,7 +72,7 @@ fun ShiftScreen(
         val summary = vm.liveSummary
         if (summary != null) {
             ShiftCloseDialog(
-                expectedRupees = centsToRupees(summary.expectedCashCents),
+                expectedCents = summary.expectedCashCents,
                 onDismiss = { showClose = false },
                 onConfirm = { counted, note ->
                     vm.close(counted, note)
@@ -151,7 +149,7 @@ private fun OpenShiftCard(vm: ShiftViewModel) {
         )
         Spacer(Modifier.height(12.dp))
         WideBtn("Open shift", primary = true, Modifier.fillMaxWidth()) {
-            if (staff != null) vm.open(floatRupees.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 0)
+            if (staff != null) vm.open(Money.parseToCents(floatRupees) ?: 0L)
         }
     }
 }
@@ -212,14 +210,14 @@ internal fun SummaryCards(summary: ShiftSummary) {
             Text("No sales yet this shift.", fontSize = 13.sp, color = c.muted)
         } else {
             summary.byMethod.sortedByDescending { it.cents }.forEach { m ->
-                SumLine("${payMethodLabel(m.paymentMethod)} · ${m.count}×", rsStr(centsToRupees(m.cents)))
+                SumLine("${payMethodLabel(m.paymentMethod)} · ${m.count}×", rsStr(m.cents))
             }
         }
         if (summary.returnsCount > 0) {
             Spacer(Modifier.height(4.dp))
             SumLine(
                 "Returns · ${summary.returnsCount}×",
-                "− ${rsStr(centsToRupees(summary.returnsTotalCents))}",
+                "− ${rsStr(summary.returnsTotalCents)}",
                 color = c.crimson,
             )
         }
@@ -227,19 +225,19 @@ internal fun SummaryCards(summary: ShiftSummary) {
     ShiftCard {
         Eyebrow("Cash drawer")
         Spacer(Modifier.height(6.dp))
-        SumLine("Opening float", rsStr(centsToRupees(shift.openingFloatCents)))
-        SumLine("Cash in (manual)", "+ ${rsStr(centsToRupees(summary.cashInCents))}")
-        SumLine("Cash out (manual)", "− ${rsStr(centsToRupees(summary.cashOutCents))}")
+        SumLine("Opening float", rsStr(shift.openingFloatCents))
+        SumLine("Cash in (manual)", "+ ${rsStr(summary.cashInCents)}")
+        SumLine("Cash out (manual)", "− ${rsStr(summary.cashOutCents)}")
         Spacer(Modifier.height(4.dp))
-        SumLine("Expected cash in drawer", rsStr(centsToRupees(summary.expectedCashCents)), bold = true)
+        SumLine("Expected cash in drawer", rsStr(summary.expectedCashCents), bold = true)
         shift.declaredCashCents?.let { declared ->
-            SumLine("Counted cash", rsStr(centsToRupees(declared)), bold = true)
+            SumLine("Counted cash", rsStr(declared), bold = true)
         }
         summary.overShortCents?.let { os ->
             val label =
                 when {
-                    os > 0 -> "OVER by ${rsStr(centsToRupees(os))}"
-                    os < 0 -> "SHORT by ${rsStr(centsToRupees(-os))}"
+                    os > 0L -> "OVER by ${rsStr(os)}"
+                    os < 0L -> "SHORT by ${rsStr(-os)}"
                     else -> "Balanced"
                 }
             SumLine("Over / short", label, bold = true, color = if (os < 0) c.crimson else c.emerald)

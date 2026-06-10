@@ -140,7 +140,7 @@ fun SaleReturnScreen(
                             Eyebrow("Refund total")
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                rsStr(vm.refundRupees),
+                                rsStr(vm.refundCents),
                                 fontFamily = JetBrainsMono,
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -154,7 +154,7 @@ fun SaleReturnScreen(
                         )
                     }
                     Spacer(Modifier.height(14.dp))
-                    val label = if (vm.canRecord) "Confirm return · ${rsStr(vm.refundRupees)}" else "Pick at least one item"
+                    val label = if (vm.canRecord) "Confirm return · ${rsStr(vm.refundCents)}" else "Pick at least one item"
                     Box(
                         Modifier
                             .fillMaxWidth()
@@ -212,7 +212,7 @@ private fun ReturnLineRow(
                 if (exhausted) {
                     "Fully returned"
                 } else {
-                    "${rsStr(line.unitPriceRupees)} each · up to ${line.maxReturnable} returnable"
+                    "${rsStr(line.unitPriceCents)} each · up to ${line.maxReturnable} returnable"
                 },
                 fontFamily = JetBrainsMono,
                 fontSize = 11.sp,

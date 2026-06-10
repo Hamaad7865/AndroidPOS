@@ -27,6 +27,7 @@ import com.nexapos.retail.ui.components.NavShell
 import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.components.PrimaryBtn
 import com.nexapos.retail.ui.components.WideBtn
+import com.nexapos.retail.util.Money
 
 /** Shared Record-Expense / Add-Income form (same shape, different labels). */
 @Composable
@@ -47,10 +48,10 @@ fun AddTxnScreen(
     var notes by remember { mutableStateOf("") }
 
     fun save() {
-        val rupees = amount.filter { it.isDigit() }.toIntOrNull() ?: 0
-        if (rupees <= 0) return
+        val cents = Money.parseToCents(amount) ?: 0L
+        if (cents <= 0L) return
         val desc = if (notes.isBlank()) description else "$description — $notes".trim(' ', '—')
-        vm.addTxn(income, category.trim(), desc, rupees, account.trim())
+        vm.addTxn(income, category.trim(), desc, cents, account.trim())
         onBack()
     }
 

@@ -96,7 +96,7 @@ private fun Sale.toIncomeEntry() =
     )
 
 /** Render shape for one ledger line in the table. */
-private data class Ledg(val d: String, val ref: String, val type: String, val desc: String, val dr: Int, val cr: Int, val bal: Int)
+private data class Ledg(val d: String, val ref: String, val type: String, val desc: String, val dr: Long, val cr: Long, val bal: Long)
 
 private fun LedgerLine.toLedg() =
     Ledg(
@@ -104,9 +104,9 @@ private fun LedgerLine.toLedg() =
         ref = ref,
         type = type,
         desc = description,
-        dr = inRupees,
-        cr = outRupees,
-        bal = balanceRupees,
+        dr = inCents,
+        cr = outCents,
+        bal = balanceCents,
     )
 
 private val MONEY_TABS = listOf("accounts" to "Cash & Bank", "income" to "Income", "expense" to "Expenses", "ledger" to "Ledger")
@@ -262,9 +262,9 @@ private fun AccountRow(a: AccountSummary) {
         }
         Column(Modifier.weight(1f)) {
             Text(a.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("in ${rsStr(a.inRupees)} · out ${rsStr(a.outRupees)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+            Text("in ${rsStr(a.inCents)} · out ${rsStr(a.outCents)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
         }
-        Text(rsStr(a.netRupees), fontFamily = JetBrainsMono, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (a.netRupees >= 0) c.emerald else c.crimson)
+        Text(rsStr(a.netCents), fontFamily = JetBrainsMono, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (a.netCents >= 0L) c.emerald else c.crimson)
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline2))
 }
@@ -272,7 +272,7 @@ private fun AccountRow(a: AccountSummary) {
 @Composable
 private fun ActivityRow(line: LedgerLine) {
     val c = PosTheme.colors
-    val moneyIn = line.inRupees > 0
+    val moneyIn = line.inCents > 0L
     val bg = if (moneyIn) c.emeraldSoft else c.crimsonSoft
     val fg = if (moneyIn) c.emerald else c.crimson
     val icon = if (moneyIn) PosIcons.arrowUp else PosIcons.arrowDn
@@ -289,7 +289,7 @@ private fun ActivityRow(line: LedgerLine) {
             Text("${line.ref} · ${ledgerDateFmt.format(Date(line.createdAt))}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(
-            (if (moneyIn) "+ " else "− ") + rsStr(if (moneyIn) line.inRupees else line.outRupees),
+            (if (moneyIn) "+ " else "− ") + rsStr(if (moneyIn) line.inCents else line.outCents),
             fontFamily = JetBrainsMono,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
@@ -379,7 +379,7 @@ fun LedgerScreen(
         remember(all, todayOnly) {
             if (todayOnly) all.filter { line -> line.createdAt >= startOfTodayMillis() } else all
         }
-    val net = remember(lines) { lines.sumOf { line -> line.inRupees - line.outRupees } }
+    val net = remember(lines) { lines.sumOf { line -> line.inCents - line.outCents } }
     val data = ledgerReportData(lines, if (todayOnly) "Today" else "Recent")
     MoneyShell(
         active = "ledger",
@@ -494,8 +494,8 @@ private fun LedgerRow(e: Ledg) {
         Text(e.ref, Modifier.width(90.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Box(Modifier.width(80.dp)) { StatusBadge(e.type.uppercase(), badge) }
         Text(e.desc, Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(if (e.dr > 0) rsStr(e.dr) else "—", Modifier.width(110.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = if (e.dr > 0) FontWeight.Bold else FontWeight.Normal, color = if (e.dr > 0) c.emerald else c.muted, textAlign = TextAlign.End)
-        Text(if (e.cr > 0) rsStr(e.cr) else "—", Modifier.width(110.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = if (e.cr > 0) FontWeight.Bold else FontWeight.Normal, color = if (e.cr > 0) c.crimson else c.muted, textAlign = TextAlign.End)
+        Text(if (e.dr > 0L) rsStr(e.dr) else "—", Modifier.width(110.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = if (e.dr > 0L) FontWeight.Bold else FontWeight.Normal, color = if (e.dr > 0L) c.emerald else c.muted, textAlign = TextAlign.End)
+        Text(if (e.cr > 0L) rsStr(e.cr) else "—", Modifier.width(110.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = if (e.cr > 0L) FontWeight.Bold else FontWeight.Normal, color = if (e.cr > 0L) c.crimson else c.muted, textAlign = TextAlign.End)
         Text(rsStr(e.bal), Modifier.width(110.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.End)
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline2))
@@ -537,8 +537,8 @@ private fun ledgerReportData(
     lines: List<LedgerLine>,
     periodLabel: String,
 ): ReportData {
-    val totalIn = lines.sumOf { it.inRupees }
-    val totalOut = lines.sumOf { it.outRupees }
+    val totalIn = lines.sumOf { it.inCents }
+    val totalOut = lines.sumOf { it.outCents }
     return ReportData(
         title = "Cash Ledger",
         subtitle = "",
@@ -559,9 +559,9 @@ private fun ledgerReportData(
                     l.type,
                     l.description,
                     l.account,
-                    if (l.inRupees > 0) rsStr(l.inRupees) else "",
-                    if (l.outRupees > 0) rsStr(l.outRupees) else "",
-                    rsStr(l.balanceRupees),
+                    if (l.inCents > 0L) rsStr(l.inCents) else "",
+                    if (l.outCents > 0L) rsStr(l.outCents) else "",
+                    rsStr(l.balanceCents),
                 )
             },
     )

@@ -75,8 +75,8 @@ class ShiftViewModel(
         error = null
     }
 
-    /** Opens a shift for the signed-in staff with [floatRupees] in the drawer. */
-    fun open(floatRupees: Int) {
+    /** Opens a shift for the signed-in staff with [floatCents] in the drawer. */
+    fun open(floatCents: Long) {
         val staff = session.current.value
         if (staff == null) {
             error = "Sign in before opening a shift."
@@ -88,7 +88,7 @@ class ShiftViewModel(
                     shiftRepository.openShift(
                         staffId = staff.id,
                         staffName = staff.name,
-                        openingFloatCents = floatRupees.toLong() * CENTS_PER_RUPEE,
+                        openingFloatCents = floatCents,
                     )
                     justClosed = null
                     null
@@ -100,7 +100,7 @@ class ShiftViewModel(
 
     /** Closes the open shift with the counted drawer cash. */
     fun close(
-        countedRupees: Int,
+        countedCents: Long,
         note: String,
     ) {
         val shift = openShift.value ?: return
@@ -109,7 +109,7 @@ class ShiftViewModel(
                 try {
                     shiftRepository.closeShift(
                         shiftId = shift.id,
-                        declaredCashCents = countedRupees.toLong() * CENTS_PER_RUPEE,
+                        declaredCashCents = countedCents,
                         note = note,
                     )
                     justClosed = shiftRepository.summary(shift.id)
