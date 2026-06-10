@@ -150,19 +150,19 @@ fun PrintingSettingsScreen(
 private fun sampleSale(): SaleSnapshot {
     val lines =
         listOf(
-            PosLine(PosProduct(id = "0", name = "Sample Hammer", cat = "Tools", price = 250, sku = "HMR-1", stock = 0, kind = "generic"), 2),
-            PosLine(PosProduct(id = "0", name = "Sample Paint 5L", cat = "Paint", price = 600, sku = "PNT-5", stock = 0, kind = "generic"), 1),
+            PosLine(PosProduct(id = "0", name = "Sample Hammer", cat = "Tools", priceCents = 250 * 100L, sku = "HMR-1", stock = 0, kind = "generic"), 2),
+            PosLine(PosProduct(id = "0", name = "Sample Paint 5L", cat = "Paint", priceCents = 600 * 100L, sku = "PNT-5", stock = 0, kind = "generic"), 1),
         )
-    val subtotal = lines.sumOf { it.lineTotal }
+    val subtotalCents = lines.sumOf { it.lineTotalCents }
     return SaleSnapshot(
         lines = lines,
-        subtotal = subtotal,
-        discount = 0,
-        vat = (subtotal * 0.15).toInt(),
-        shipping = 0,
-        total = subtotal,
-        received = subtotal,
-        change = 0,
+        subtotalCents = subtotalCents,
+        discountCents = 0,
+        vatCents = (subtotalCents * 0.15).toLong(),
+        shippingCents = 0,
+        totalCents = subtotalCents,
+        receivedCents = subtotalCents,
+        changeCents = 0,
         pay = "cash",
         invoiceNo = "TEST-0001",
         createdAt = System.currentTimeMillis(),

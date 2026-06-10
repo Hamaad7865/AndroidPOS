@@ -63,8 +63,8 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
         }
     }
 
-    /** Total retail value of stock on hand, in whole rupees. */
-    val stockValue: Int get() = products.sumOf { it.price * it.stock }
+    /** Total retail value of stock on hand, in cents. */
+    val stockValueCents: Long get() = products.sumOf { it.priceCents * it.stock }
 
     /** Loads a single product by id — used when opening a row to edit. */
     suspend fun loadProduct(id: Long): Product? = catalogRepository.getProduct(id)
@@ -81,8 +81,8 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
         name: String,
         sku: String,
         barcode: String?,
-        priceRupees: Int,
-        costRupees: Int,
+        priceCents: Long,
+        costCents: Long,
         mainCategoryName: String,
         subCategoryName: String,
         brandName: String,
@@ -96,7 +96,7 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
         kind: String,
         imagePath: String?,
     ) {
-        if (name.isBlank() || priceRupees <= 0) return
+        if (name.isBlank() || priceCents <= 0L) return
         val trimmedMain = mainCategoryName.trim()
         val trimmedSub = subCategoryName.trim()
         val trimmedBrand = brandName.trim()
@@ -122,8 +122,6 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
                     existing = brandEntities.firstOrNull { it.name.equals(trimmedBrand, ignoreCase = true) }?.id,
                 ) { catalogRepository.upsertBrand(Brand(name = trimmedBrand)) }
             val previous = id?.let { catalogRepository.getProduct(it) }
-            val priceCents = priceRupees * CENTS_PER_RUPEE
-            val costCents = costRupees * CENTS_PER_RUPEE
             val base = previous ?: Product(name = "", priceCents = 0)
             catalogRepository.upsert(
                 base.copy(
@@ -238,8 +236,8 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
             name = row.name.trim(),
             sku = row.sku.trim(),
             barcode = barcode,
-            priceCents = row.priceRupees * CENTS_PER_RUPEE,
-            costCents = if (parsed.hasCost) row.costRupees * CENTS_PER_RUPEE else base.costCents,
+            priceCents = row.priceCents,
+            costCents = if (parsed.hasCost) row.costCents else base.costCents,
             stockQty = if (parsed.hasStock) row.stock else base.stockQty,
             categoryId = categoryId ?: base.categoryId,
             isActive = true,
@@ -255,8 +253,4 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
             name.isNotEmpty() -> create()
             else -> null
         }
-
-    private companion object {
-        const val CENTS_PER_RUPEE = 100L
-    }
 }

@@ -2,6 +2,7 @@ package com.nexapos.retail.ui.products
 
 import com.nexapos.retail.data.barcode.Ean13
 import com.nexapos.retail.ui.sale.PosProduct
+import com.nexapos.retail.util.Money
 import com.nexapos.retail.util.csvCell
 
 /**
@@ -43,10 +44,10 @@ internal fun productsCsv(
                 p.sku,
                 p.barcode.orEmpty(),
                 p.cat,
-                p.cost.toString().takeIf { includeCost },
-                p.price.toString(),
+                Money.toInput(p.costCents).takeIf { includeCost },
+                Money.toInput(p.priceCents),
                 p.stock.toString(),
-                (p.price * p.stock).toString(),
+                Money.toInput(p.priceCents * p.stock),
             )
         sb.append(row.joinToString(",") { csvCell(it) }).append("\r\n")
     }
@@ -63,8 +64,8 @@ internal data class ImportRow(
     val sku: String,
     val barcode: String?,
     val category: String,
-    val costRupees: Int,
-    val priceRupees: Int,
+    val costCents: Long,
+    val priceCents: Long,
     val stock: Int,
 )
 
@@ -128,13 +129,13 @@ internal fun parseProductsCsv(text: String): ParsedImport {
 
         fun cell(idx: Int) = if (idx in raw.indices) raw[idx].trim() else ""
         val name = cell(nameIdx)
-        val price = parseMoney(cell(priceIdx))
+        val priceCents = Money.parseToCents(cell(priceIdx))
         when {
             name.isBlank() -> {
                 skipped++
                 note("Line $lineNo: missing product name — skipped.")
             }
-            price <= 0 -> {
+            priceCents == null || priceCents <= 0L -> {
                 skipped++
                 note("Line $lineNo: \"$name\" has no valid price — skipped.")
             }
@@ -145,9 +146,9 @@ internal fun parseProductsCsv(text: String): ParsedImport {
                         sku = cell(skuIdx),
                         barcode = cell(barcodeIdx).takeIf { it.isNotEmpty() },
                         category = cell(catIdx),
-                        costRupees = parseMoney(cell(costIdx)),
-                        priceRupees = price,
-                        stock = parseMoney(cell(stockIdx)),
+                        costCents = Money.parseToCents(cell(costIdx)) ?: 0L,
+                        priceCents = priceCents,
+                        stock = cell(stockIdx).filter { it.isDigit() }.toIntOrNull() ?: 0,
                     )
         }
     }
@@ -156,11 +157,6 @@ internal fun parseProductsCsv(text: String): ParsedImport {
 }
 
 private fun normaliseHeader(raw: String): String = raw.lowercase().filter { it.isLetterOrDigit() }
-
-/** Whole-rupee amount from a messy cell like "Rs 1,200.50" → 1200. */
-private fun parseMoney(cell: String): Int =
-    cell.replace(",", "").filter { it.isDigit() || it == '.' || it == '-' }
-        .toDoubleOrNull()?.toInt() ?: 0
 
 /**
  * Splits CSV [text] into rows of cells, honouring RFC-4180 quoting: quoted
@@ -240,7 +236,7 @@ internal fun labelsHtml(
             <div class="label">
               <div class="biz">$biz</div>
               <div class="name">${htmlEscape(p.name)}</div>
-              <div class="price">Rs ${p.price}</div>
+              <div class="price">Rs ${Money.toInput(p.priceCents)}</div>
               $barcodeBlock
             </div>
             """.trimIndent()

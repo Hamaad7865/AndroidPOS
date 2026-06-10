@@ -69,7 +69,6 @@ import com.nexapos.retail.ui.components.PickerField
 import com.nexapos.retail.ui.components.PosIcon
 import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.components.ProductThumb
-import com.nexapos.retail.ui.components.formatNum
 import com.nexapos.retail.ui.sale.PosProduct
 import com.nexapos.retail.ui.sale.categoryLabel
 import com.nexapos.retail.ui.sale.matchesCategory
@@ -77,11 +76,10 @@ import com.nexapos.retail.ui.session.rememberIsAdmin
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private fun rs(n: Int) = "Rs " + formatNum(n.toDouble(), 0)
 
 // ---------------------------------------------------------------------------
 // Filter + sort state
@@ -146,8 +144,8 @@ fun ProductsListScreen(
                     when (sortBy) {
                         SortBy.NAME_AZ -> list.sortedBy { item -> item.name.lowercase() }
                         SortBy.NAME_ZA -> list.sortedByDescending { item -> item.name.lowercase() }
-                        SortBy.PRICE_HI -> list.sortedByDescending { item -> item.price }
-                        SortBy.PRICE_LO -> list.sortedBy { item -> item.price }
+                        SortBy.PRICE_HI -> list.sortedByDescending { item -> item.priceCents }
+                        SortBy.PRICE_LO -> list.sortedBy { item -> item.priceCents }
                         SortBy.STOCK_HI -> list.sortedByDescending { item -> item.stock }
                         SortBy.STOCK_LO -> list.sortedBy { item -> item.stock }
                     }
@@ -223,7 +221,7 @@ fun ProductsListScreen(
     NavShell(active = "products", onNav = onNav) {
         AppBar(
             title = "Products",
-            subtitle = "${vm.products.size} SKUs · ${vm.categoryTree.size} categories · ${rs(vm.stockValue)} stock value",
+            subtitle = "${vm.products.size} SKUs · ${vm.categoryTree.size} categories · ${Money.format(vm.stockValueCents)} stock value",
             right = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SecBtn(PosIcons.upload, "Import") { showImportHelp = true }
@@ -370,11 +368,11 @@ private fun TableRow(
         }
         Text(categoryLabel(p.mainCat, p.cat), Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (showCost) {
-            Text(if (p.cost > 0) rs(p.cost) else "—", Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.graphite, textAlign = TextAlign.End)
+            Text(if (p.costCents > 0L) Money.format(p.costCents) else "—", Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.graphite, textAlign = TextAlign.End)
         }
-        Text(rs(p.price), Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.End)
+        Text(Money.format(p.priceCents), Modifier.width(80.dp), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.End)
         Box(Modifier.width(64.dp), contentAlignment = Alignment.CenterEnd) { StockBadge(p.stock) }
-        Text(rs(p.price * p.stock), Modifier.width(96.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End)
+        Text(Money.format(p.priceCents * p.stock), Modifier.width(96.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End)
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline2))
 }
@@ -653,8 +651,8 @@ fun AddProductScreen(
                 shelf = p.shelf
                 model = p.model
                 unit = p.unit.ifBlank { "pcs" }
-                price = (p.priceCents / 100).toString()
-                cost = (p.costCents / 100).toString()
+                price = Money.toInput(p.priceCents)
+                cost = Money.toInput(p.costCents)
                 stock = p.stockQty.toString()
                 lowStock = p.lowStockThreshold.toString()
                 vatType = VatType.from(p.vatType)
@@ -680,9 +678,9 @@ fun AddProductScreen(
             }
         }
 
-    val priceRupees = price.filter { it.isDigit() }.toIntOrNull() ?: 0
-    val costRupees = cost.filter { it.isDigit() }.toIntOrNull() ?: 0
-    val canPublish = name.isNotBlank() && priceRupees > 0 && loaded
+    val priceCents = Money.parseToCents(price) ?: 0L
+    val costCents = Money.parseToCents(cost) ?: 0L
+    val canPublish = name.isNotBlank() && priceCents > 0L && loaded
     // Cashiers never see purchase price or margin; on save the loaded cost
     // state passes through publish() unchanged, so hiding the field is safe.
     val admin = rememberIsAdmin()
@@ -696,8 +694,8 @@ fun AddProductScreen(
             name = name,
             sku = sku,
             barcode = barcode,
-            priceRupees = priceRupees,
-            costRupees = costRupees,
+            priceCents = priceCents,
+            costCents = costCents,
             mainCategoryName = mainCategory,
             subCategoryName = subCategory,
             brandName = brand,
@@ -922,13 +920,13 @@ fun AddProductScreen(
                             )
                         }
                     }
-                    val hasMargin = priceRupees > 0 && costRupees > 0 && priceRupees > costRupees
+                    val hasMargin = priceCents > 0L && costCents > 0L && priceCents > costCents
                     if (admin && hasMargin) {
                         Spacer(Modifier.height(8.dp))
-                        val margin = priceRupees - costRupees
-                        val marginPct = (margin * 100) / priceRupees
+                        val marginCents = priceCents - costCents
+                        val marginPct = (marginCents * 100 / priceCents).toInt()
                         Text(
-                            "Margin Rs $margin ($marginPct%)",
+                            "Margin ${Money.format(marginCents)} ($marginPct%)",
                             fontSize = 11.sp,
                             color = c.emerald,
                         )

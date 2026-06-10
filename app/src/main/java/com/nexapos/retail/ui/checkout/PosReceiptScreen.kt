@@ -51,8 +51,9 @@ import com.nexapos.retail.ui.sale.SellingViewModel
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 
-private fun rs(n: Int) = "Rs " + formatNum(n.toDouble(), 0)
+private fun rs(cents: Long) = Money.format(cents)
 
 private val receiptDateFmt = java.text.SimpleDateFormat("dd MMM yyyy · HH:mm", java.util.Locale.US)
 private val barcodeDateFmt = java.text.SimpleDateFormat("ddMMyyyy", java.util.Locale.US)
@@ -128,13 +129,13 @@ private fun Confirmation(
             Text("PAYMENT CONFIRMED", fontSize = 13.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.Bold, color = c.emerald)
         }
         Spacer(Modifier.height(20.dp))
-        CountUp(sale.total.toDouble(), prefix = "Rs ", decimals = 0, fontSize = 60.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
+        CountUp(sale.totalCents / 100.0, prefix = "Rs ", decimals = 2, fontSize = 60.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
         Spacer(Modifier.height(8.dp))
         Text(
-            if (sale.creditDue > 0) {
-                "on credit · balance due ${rs(sale.creditDue)}"
+            if (sale.creditDueCents > 0L) {
+                "on credit · balance due ${rs(sale.creditDueCents)}"
             } else {
-                "received · change ${rs(maxOf(0, sale.change))}"
+                "received · change ${rs(maxOf(0L, sale.changeCents))}"
             },
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
@@ -308,29 +309,29 @@ private fun ReceiptPaper(sale: SaleSnapshot) {
                     Text(l.product.name, fontFamily = HankenGrotesk, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = receiptInk, modifier = Modifier.weight(1f))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${l.qty} × ${formatNum(l.effectivePrice.toDouble(), 0)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
-                    Text(formatNum(l.lineTotal.toDouble(), 0), fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
+                    Text("${l.qty} × ${formatNum(l.effectivePriceCents / 100.0, 2)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
+                    Text(formatNum(l.lineTotalCents / 100.0, 2), fontFamily = JetBrainsMono, fontSize = 11.sp, color = receiptInk)
                 }
-                if (l.discount > 0) {
+                if (l.discountCents > 0L) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        Text("− ${formatNum(l.discount.toDouble(), 0)} disc", fontFamily = JetBrainsMono, fontSize = 10.sp, color = receiptInk)
+                        Text("− ${formatNum(l.discountCents / 100.0, 2)} disc", fontFamily = JetBrainsMono, fontSize = 10.sp, color = receiptInk)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
             }
             DashedLine()
-            RcMoney(if (vatRegistered) "Subtotal (incl. VAT)" else "Subtotal", sale.subtotal)
-            if (vatRegistered) RcMoney("VAT 15% (incl.)", sale.vat)
-            RcMoney("Discount", sale.discount + sale.lines.sumOf { it.discount })
+            RcMoney(if (vatRegistered) "Subtotal (incl. VAT)" else "Subtotal", sale.subtotalCents)
+            if (vatRegistered) RcMoney("VAT 15% (incl.)", sale.vatCents)
+            RcMoney("Discount", sale.discountCents + sale.lines.sumOf { it.discountCents })
             Box(Modifier.fillMaxWidth().height(1.dp).background(receiptInk).padding(vertical = 4.dp))
-            RcMoney("TOTAL", sale.total, big = true)
-            RcMoney("Paid · ${sale.pay}", sale.received)
-            if (sale.creditDue > 0) {
-                RcMoney("BALANCE DUE", sale.creditDue, big = true)
+            RcMoney("TOTAL", sale.totalCents, big = true)
+            RcMoney("Paid · ${sale.pay}", sale.receivedCents)
+            if (sale.creditDueCents > 0L) {
+                RcMoney("BALANCE DUE", sale.creditDueCents, big = true)
             } else {
-                RcMoney("Change", maxOf(0, sale.change))
+                RcMoney("Change", maxOf(0L, sale.changeCents))
             }
-            if (sale.creditDue > 0) {
+            if (sale.creditDueCents > 0L) {
                 Text(
                     "On credit to ${sale.customerName} · added to their account.",
                     fontFamily = JetBrainsMono,
@@ -394,11 +395,11 @@ private fun RcRow(
 @Composable
 private fun RcMoney(
     label: String,
-    value: Int,
+    valueCents: Long,
     big: Boolean = false,
 ) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontFamily = HankenGrotesk, fontSize = if (big) 14.sp else 11.5.sp, fontWeight = if (big) FontWeight.ExtraBold else FontWeight.Medium, color = receiptInk)
-        Text("Rs ${formatNum(value.toDouble(), 0)}", fontFamily = JetBrainsMono, fontSize = if (big) 14.sp else 11.5.sp, fontWeight = if (big) FontWeight.ExtraBold else FontWeight.Medium, color = receiptInk)
+        Text(Money.format(valueCents), fontFamily = JetBrainsMono, fontSize = if (big) 14.sp else 11.5.sp, fontWeight = if (big) FontWeight.ExtraBold else FontWeight.Medium, color = receiptInk)
     }
 }

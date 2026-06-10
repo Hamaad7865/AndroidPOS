@@ -72,14 +72,11 @@ import com.nexapos.retail.ui.components.isPortrait
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Locale
 import kotlin.math.roundToInt
 
-private val numFmt = NumberFormat.getNumberInstance(Locale.US)
-
-private fun rs(n: Int) = "Rs " + numFmt.format(n)
+private fun rs(cents: Long) = Money.format(cents)
 
 private data class FlyChip(val id: Long, val start: Offset, val target: Offset)
 
@@ -129,9 +126,9 @@ fun PosSaleScreen(
         chips.add(FlyChip(chipSeq++, start, target))
     }
 
-    val subtotal = vm.subtotal
-    val vat = vm.vat
-    val total = vm.total
+    val subtotal = vm.subtotalCents
+    val vat = vm.vatCents
+    val total = vm.totalCents
 
     // Keep the till's VAT gate in sync with the business's VAT-registration setting.
     val vatCtx = androidx.compose.ui.platform.LocalContext.current
@@ -392,7 +389,7 @@ fun PosSaleScreen(
                     Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
                     Column(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 18.dp, vertical = 14.dp)) {
                         TotalRow("Subtotal", rs(subtotal), false)
-                        TotalRow("Discount", if (vm.discount > 0) "— " + rs(vm.discount) else "Rs 0", true)
+                        TotalRow("Discount", if (vm.discountCents > 0L) "— " + rs(vm.discountCents) else "Rs 0", true)
                         if (vatRegistered) TotalRow("VAT (15%, incl.)", rs(vat), true)
                         Spacer(Modifier.height(10.dp))
                         Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
@@ -410,9 +407,9 @@ fun PosSaleScreen(
                                 color = c.muted,
                             )
                             CountUp(
-                                total.toDouble(),
+                                total / 100.0,
                                 prefix = "Rs ",
-                                decimals = 0,
+                                decimals = 2,
                                 fontSize = 34.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = c.ink,
@@ -574,7 +571,7 @@ private fun ProductCard(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(rs(p.price), fontFamily = JetBrainsMono, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.ink)
+            Text(rs(p.priceCents), fontFamily = JetBrainsMono, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.ink)
             Text(p.sku, fontFamily = JetBrainsMono, fontSize = 10.5.sp, color = c.muted)
         }
     }
@@ -613,7 +610,7 @@ private fun TicketLine(
                 color = c.ink,
             )
             Text(
-                "${line.product.sku} · ${rs(line.effectivePrice)}",
+                "${line.product.sku} · ${rs(line.effectivePriceCents)}",
                 fontFamily = JetBrainsMono,
                 fontSize = 11.sp,
                 color = c.muted,
@@ -639,7 +636,7 @@ private fun TicketLine(
             StepBtn(PosIcons.plus, onInc)
         }
         Text(
-            rs(line.lineTotal),
+            rs(line.lineTotalCents),
             fontFamily = JetBrainsMono,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
@@ -946,7 +943,7 @@ private fun HoldMenuButton(vm: SellingViewModel) {
                                     color = c.ink,
                                 )
                                 Text(
-                                    "${ticket.itemCount} item${if (ticket.itemCount == 1) "" else "s"} · ${rs(ticket.total)}",
+                                    "${ticket.itemCount} item${if (ticket.itemCount == 1) "" else "s"} · ${rs(ticket.totalCents)}",
                                     fontFamily = JetBrainsMono,
                                     fontSize = 11.sp,
                                     color = c.muted,
@@ -1017,7 +1014,7 @@ private fun SecondaryButton(
 
 @Composable
 private fun ChargeButton(
-    total: Int,
+    totalCents: Long,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
@@ -1040,9 +1037,9 @@ private fun ChargeButton(
             color = androidx.compose.ui.graphics.Color.White,
         )
         CountUp(
-            total.toDouble(),
+            totalCents / 100.0,
             prefix = "Rs ",
-            decimals = 0,
+            decimals = 2,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = androidx.compose.ui.graphics.Color.White,
@@ -1131,7 +1128,7 @@ private fun ItemLookupDialog(
                                 Text(p.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text("Stock: ${p.stock} · ${p.sku.ifBlank { "no SKU" }}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
                             }
-                            Text(rs(p.price), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                            Text(rs(p.priceCents), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.ink)
                         }
                     }
                     if (results.isEmpty()) Text("No matches.", fontSize = 12.sp, color = c.muted)
@@ -1167,8 +1164,8 @@ private fun PriceDialog(
                         ) {
                             Text("Rs", fontSize = 12.sp, color = c.muted)
                             BasicTextField(
-                                value = if (line.effectivePrice == 0) "" else line.effectivePrice.toString(),
-                                onValueChange = { vm.setLinePrice(line.product.id, it.toIntOrNull() ?: 0) },
+                                value = Money.toInput(line.effectivePriceCents),
+                                onValueChange = { vm.setLinePrice(line.product.id, Money.parseToCents(it) ?: 0L) },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
                                 textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),

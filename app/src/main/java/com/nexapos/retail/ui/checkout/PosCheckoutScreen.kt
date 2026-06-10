@@ -51,13 +51,13 @@ import com.nexapos.retail.ui.components.PosIcon
 import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.components.ProductTile
 import com.nexapos.retail.ui.components.ResponsiveSplit
-import com.nexapos.retail.ui.components.formatNum
 import com.nexapos.retail.ui.components.isPortrait
 import com.nexapos.retail.ui.sale.SellingViewModel
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 
-private fun rs(n: Int) = "Rs " + formatNum(n.toDouble(), 0)
+private fun rs(cents: Long) = Money.format(cents)
 
 private val checkoutHeaderDateFmt = java.text.SimpleDateFormat("dd MMM yyyy · HH:mm", java.util.Locale.US)
 
@@ -177,9 +177,9 @@ private fun BillCard(
                         }
                         Column(Modifier.weight(1f)) {
                             Text(l.product.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = c.ink)
-                            Text("${l.product.sku} · ${l.qty} × ${rs(l.effectivePrice)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                            Text("${l.product.sku} · ${l.qty} × ${rs(l.effectivePriceCents)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
                         }
-                        Text(rs(l.lineTotal), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                        Text(rs(l.lineTotalCents), fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink)
                     }
                     Divider(c.hairline2)
                 }
@@ -204,19 +204,19 @@ private fun BillCard(
                 ) {
                     Text("Discount", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
                     Text(
-                        if (vm.totalDiscount > 0) "− " + rs(vm.totalDiscount) else "Add discount",
+                        if (vm.totalDiscountCents > 0L) "− " + rs(vm.totalDiscountCents) else "Add discount",
                         fontFamily = JetBrainsMono,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (vm.totalDiscount > 0) c.ink else c.amber,
+                        color = if (vm.totalDiscountCents > 0L) c.ink else c.amber,
                     )
                 }
                 NumField(
                     label = "Shipping",
-                    value = vm.shipping,
+                    valueCents = vm.shippingCents,
                     onChange = { v ->
-                        vm.shipping = v
-                        if (!vm.isCredit) vm.received = vm.total
+                        vm.shippingCents = v
+                        if (!vm.isCredit) vm.receivedCents = vm.totalCents
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -224,16 +224,16 @@ private fun BillCard(
         }
         Divider()
         Column(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 18.dp, vertical = 16.dp)) {
-            BreakdownRow("Subtotal", rs(vm.subtotal))
-            BreakdownRow("Discount", "− ${rs(vm.totalDiscount)}")
-            if (vatRegistered) BreakdownRow("VAT (15% incl.)", rs(vm.vat))
-            if (vm.shipping > 0) BreakdownRow("Shipping", "+ ${rs(vm.shipping)}")
+            BreakdownRow("Subtotal", rs(vm.subtotalCents))
+            BreakdownRow("Discount", "− ${rs(vm.totalDiscountCents)}")
+            if (vatRegistered) BreakdownRow("VAT (15% incl.)", rs(vm.vatCents))
+            if (vm.shippingCents > 0L) BreakdownRow("Shipping", "+ ${rs(vm.shippingCents)}")
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("TOTAL", fontSize = 13.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.SemiBold, color = c.muted)
-                CountUp(vm.total.toDouble(), prefix = "Rs ", decimals = 0, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
+                CountUp(vm.totalCents / 100.0, prefix = "Rs ", decimals = 2, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
             }
         }
     }
@@ -277,26 +277,26 @@ private fun PayCard(
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     Eyebrow(if (vm.isCredit) "Paid now" else "Received")
-                    Text(rs(vm.received), fontFamily = JetBrainsMono, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
+                    Text(rs(vm.receivedCents), fontFamily = JetBrainsMono, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
                 }
                 Column(Modifier.weight(1f)) {
                     if (vm.isCredit) {
                         Eyebrow("On credit (owed)")
                         Text(
-                            rs(vm.creditDue),
+                            rs(vm.creditDueCents),
                             fontFamily = JetBrainsMono,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = c.crimson,
                         )
                     } else {
-                        Eyebrow(if (vm.change >= 0) "Change" else "Amount due")
+                        Eyebrow(if (vm.changeCents >= 0L) "Change" else "Amount due")
                         Text(
-                            rs(kotlin.math.abs(vm.change)),
+                            rs(kotlin.math.abs(vm.changeCents)),
                             fontFamily = JetBrainsMono,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = if (vm.change >= 0) c.emerald else c.crimson,
+                            color = if (vm.changeCents >= 0L) c.emerald else c.crimson,
                         )
                     }
                 }
@@ -336,7 +336,7 @@ private fun PayCard(
         // quick amounts + complete — pinned at the bottom, always reachable
         Column(Modifier.fillMaxWidth().background(c.raised2).padding(14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(vm.total, 500, 1000, 2000).forEachIndexed { i, v ->
+                listOf(vm.totalCents, 50_000L, 100_000L, 200_000L).forEachIndexed { i, v ->
                     Box(
                         Modifier
                             .weight(1f)
@@ -344,7 +344,7 @@ private fun PayCard(
                             .clip(CircleShape)
                             .background(c.raised)
                             .border(1.dp, c.hairline, CircleShape)
-                            .clickable { vm.received = v },
+                            .clickable { vm.receivedCents = v },
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(if (i == 0) "Exact" else rs(v), fontFamily = JetBrainsMono, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1)
@@ -386,9 +386,9 @@ private fun PayCard(
                         color = Color.White,
                     )
                     CountUp(
-                        (if (vm.isCredit) vm.creditDue else vm.total).toDouble(),
+                        (if (vm.isCredit) vm.creditDueCents else vm.totalCents) / 100.0,
                         prefix = "Rs ",
-                        decimals = 0,
+                        decimals = 2,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
@@ -542,8 +542,8 @@ private fun Divider(color: Color = PosTheme.colors.hairline) {
 @Composable
 private fun NumField(
     label: String,
-    value: Int,
-    onChange: (Int) -> Unit,
+    valueCents: Long,
+    onChange: (Long) -> Unit,
     modifier: Modifier,
 ) {
     val c = PosTheme.colors
@@ -563,8 +563,8 @@ private fun NumField(
         ) {
             Text("Rs", fontSize = 13.sp, color = c.muted)
             BasicTextField(
-                value = if (value == 0) "" else value.toString(),
-                onValueChange = { onChange(it.toIntOrNull() ?: 0) },
+                value = Money.toInput(valueCents),
+                onValueChange = { onChange(Money.parseToCents(it) ?: 0L) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
                 textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
@@ -582,10 +582,10 @@ private fun DiscountDialog(
 ) {
     val c = PosTheme.colors
     // Snapshot for Cancel/revert.
-    val snapCart = remember { vm.discount }
+    val snapCart = remember { vm.discountCents }
     val snapIsPct = remember { vm.discountIsPercent }
     val snapPct = remember { vm.discountPercent }
-    val snapLines = remember { vm.workingLines.associate { it.product.id to it.discount } }
+    val snapLines = remember { vm.workingLines.associate { it.product.id to it.discountCents } }
     var tab by remember { mutableStateOf(0) }
     var selectedId by remember { mutableStateOf(vm.workingLines.firstOrNull()?.product?.id) }
     androidx.compose.ui.window.Dialog(
@@ -620,11 +620,11 @@ private fun DiscountDialog(
                         ) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(line.product.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                Text(rs(line.lineTotal), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink)
+                                Text(rs(line.lineTotalCents), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink)
                             }
-                            Text("${line.qty} × ${rs(line.effectivePrice)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
-                            if (line.discount > 0) {
-                                Text("− ${rs(line.discount)} disc", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber)
+                            Text("${line.qty} × ${rs(line.effectivePriceCents)}", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.muted)
+                            if (line.discountCents > 0L) {
+                                Text("− ${rs(line.discountCents)} disc", fontFamily = JetBrainsMono, fontSize = 11.sp, color = c.amber)
                             }
                         }
                     }
@@ -639,9 +639,9 @@ private fun DiscountDialog(
                     if (tab == 0) CartControls(vm) else ItemControls(vm, selectedId)
                     Spacer(Modifier.weight(1f))
                     Divider()
-                    SummaryRow("Subtotal", rs(vm.subtotal))
-                    SummaryRow("Total discount", "− " + rs(vm.totalDiscount))
-                    SummaryRow("Total", rs(vm.total), bold = true)
+                    SummaryRow("Subtotal", rs(vm.subtotalCents))
+                    SummaryRow("Total discount", "− " + rs(vm.totalDiscountCents))
+                    SummaryRow("Total", rs(vm.totalCents), bold = true)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -688,11 +688,11 @@ private fun CartControls(vm: SellingViewModel) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Apply cart discount", fontSize = 12.sp, color = c.muted)
             Row(Modifier.clip(RoundedCornerShape(7.dp)).border(1.dp, c.hairline, RoundedCornerShape(7.dp))) {
-                ModeChip("%", isPct) { vm.applyDiscount(isPercent = true, value = vm.discountPercent) }
-                ModeChip("Rs", !isPct) { vm.applyDiscount(isPercent = false, value = vm.discount) }
+                ModeChip("%", isPct) { vm.applyDiscount(isPercent = true, value = vm.discountPercent.toLong()) }
+                ModeChip("Rs", !isPct) { vm.applyDiscount(isPercent = false, value = vm.discountCents) }
             }
         }
-        DiscountInputRow(isPct = isPct, value = if (isPct) vm.discountPercent else vm.discount) { v ->
+        DiscountInputRow(isPct = isPct, value = if (isPct) vm.discountPercent.toLong() else vm.discountCents) { v ->
             vm.applyDiscount(isPercent = isPct, value = v)
         }
     }
@@ -710,7 +710,7 @@ private fun ItemControls(
         return
     }
     var pct by remember(selectedId) { mutableStateOf(false) }
-    var pctInput by remember(selectedId) { mutableStateOf(0) }
+    var pctInput by remember(selectedId) { mutableStateOf(0L) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Text(line.product.name, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -719,7 +719,7 @@ private fun ItemControls(
                 ModeChip("Rs", !pct) { pct = false }
             }
         }
-        DiscountInputRow(isPct = pct, value = if (pct) pctInput else line.discount) { v ->
+        DiscountInputRow(isPct = pct, value = if (pct) pctInput else line.discountCents) { v ->
             if (pct) pctInput = v
             vm.applyItemDiscount(line.product.id, isPercent = pct, value = v)
         }
@@ -729,9 +729,9 @@ private fun ItemControls(
 @Composable
 private fun DiscountInputRow(
     isPct: Boolean,
-    value: Int,
+    value: Long,
     modifier: Modifier = Modifier,
-    onChange: (Int) -> Unit,
+    onChange: (Long) -> Unit,
 ) {
     val c = PosTheme.colors
     Row(
@@ -742,8 +742,17 @@ private fun DiscountInputRow(
     ) {
         if (!isPct) Text("Rs", fontSize = 13.sp, color = c.muted)
         BasicTextField(
-            value = if (value == 0) "" else value.toString(),
-            onValueChange = { onChange(it.toIntOrNull() ?: 0) },
+            // Percent mode is a plain 0..100 integer; Rs mode is a decimal amount → cents.
+            value = if (isPct) (if (value == 0L) "" else value.toString()) else Money.toInput(value),
+            onValueChange = {
+                onChange(
+                    if (isPct) {
+                        it.filter { ch -> ch.isDigit() }.toLongOrNull() ?: 0L
+                    } else {
+                        Money.parseToCents(it) ?: 0L
+                    },
+                )
+            },
             singleLine = true,
             modifier = Modifier.weight(1f),
             textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),

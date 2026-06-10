@@ -7,7 +7,7 @@ class ProductOrderTest {
     private fun p(
         id: String,
         name: String,
-    ) = PosProduct(id = id, name = name, cat = "c", price = 1, sku = "", stock = 0, kind = "generic")
+    ) = PosProduct(id = id, name = name, cat = "c", priceCents = 1L, sku = "", stock = 0, kind = "generic")
 
     @Test
     fun `empty order is alphabetical`() {

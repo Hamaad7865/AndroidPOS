@@ -13,11 +13,11 @@ class ProductsCsvTest {
             id = "1",
             name = "Claw Hammer",
             cat = "Tools",
-            price = 250,
+            priceCents = 250 * 100L,
             sku = "HAM-01",
             stock = 12,
             kind = "generic",
-            cost = 140,
+            costCents = 140 * 100L,
         )
 
     @Test
@@ -45,8 +45,8 @@ class ProductsCsvTest {
         assertEquals(1, parsed.rows.size)
         val row = parsed.rows.first()
         assertEquals("Claw Hammer", row.name)
-        assertEquals(250, row.priceRupees)
-        assertEquals(0, row.costRupees) // cost absent → defaults to 0, never leaked
+        assertEquals(250 * 100L, row.priceCents)
+        assertEquals(0L, row.costCents) // cost absent → defaults to 0, never leaked
     }
 
     @Test

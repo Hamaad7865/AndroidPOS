@@ -44,12 +44,12 @@ class SellingViewModelTest {
     private fun vm() = SellingViewModel(catalog, sales, parties, drawer, shifts, session)
 
     @Test
-    fun `catalog is mapped to whole-rupee display products`() =
+    fun `catalog is mapped to cents display products`() =
         runTest {
             val model = vm()
             assertEquals(2, model.products.size)
             val wrench = model.products.first { it.sku == "WRN-T17" }
-            assertEquals(185, wrench.price)
+            assertEquals(18_500, wrench.priceCents)
             assertEquals("Tools", wrench.cat)
             assertEquals(listOf("Tools"), model.categoryTree.map { it.name })
         }
@@ -60,8 +60,8 @@ class SellingViewModelTest {
             val model = vm()
             val wrench = model.products.first { it.sku == "WRN-T17" }
             model.addToCart(wrench)
-            model.setLinePrice(wrench.id, 200)
-            assertEquals(200, model.subtotal)
+            model.setLinePrice(wrench.id, 200 * 100L)
+            assertEquals(200 * 100L, model.subtotalCents)
             model.beginCheckout()
             model.complete()
             val (_, items) = sales.recorded.first()
@@ -96,9 +96,9 @@ class SellingViewModelTest {
             // subtotal = 185*2 + 320 = 690
             // vat (inclusive) = 690 - round(690 / 1.15) = 690 - round(600.0) = 690 - 600 = 90
             // total = subtotal - discount + shipping = 690 - 0 + 0 = 690 (VAT NOT added again)
-            assertEquals(690, model.subtotal)
-            assertEquals(90, model.vat)
-            assertEquals(690, model.total)
+            assertEquals(690 * 100L, model.subtotalCents)
+            assertEquals(90 * 100L, model.vatCents)
+            assertEquals(690 * 100L, model.totalCents)
         }
 
     @Test
@@ -228,9 +228,9 @@ class SellingViewModelTest {
         runTest {
             val model = vm()
             val wrench = model.products.first { it.sku == "WRN-T17" }
-            model.addToCart(wrench) // total = 185
+            model.addToCart(wrench) // total = Rs 185
             model.beginCheckout()
-            model.received = 100 // deliberately less than 185
+            model.receivedCents = 100 * 100L // Rs 100, deliberately less than Rs 185
             // canComplete must be false due to isFullyTendered being false
             assertTrue(!model.canComplete)
             model.complete()

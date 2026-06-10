@@ -8,7 +8,6 @@ import com.nexapos.retail.data.entity.VatType
 /** Filter label shown first in every category chip row. */
 const val ALL_CATEGORY = "All"
 
-private const val CENTS_PER_RUPEE = 100L
 private const val UNCATEGORISED = "Other"
 
 /** Maps Room [Product]s to the lightweight display model used across the UI. */
@@ -28,12 +27,12 @@ fun List<Product>.toPosProducts(
             name = product.name,
             cat = leafName,
             mainCat = mainName,
-            price = (product.priceCents / CENTS_PER_RUPEE).toInt(),
+            priceCents = product.priceCents,
             sku = product.sku,
             stock = product.stockQty,
             kind = product.kind,
             barcode = product.barcode,
-            cost = (product.costCents / CENTS_PER_RUPEE).toInt(),
+            costCents = product.costCents,
             brand = brandById[product.brandId].orEmpty(),
             model = product.model,
             unit = product.unit,

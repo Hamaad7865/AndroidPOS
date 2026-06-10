@@ -1,7 +1,7 @@
 package com.nexapos.retail.ui.sale
 
 import com.nexapos.retail.data.entity.VatType
-import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 private const val STANDARD_DIVISOR = 1.15
 
@@ -13,13 +13,13 @@ private const val STANDARD_DIVISOR = 1.15
 fun vatOf(
     lines: List<PosLine>,
     vatRegistered: Boolean,
-): Int {
-    if (!vatRegistered) return 0
+): Long {
+    if (!vatRegistered) return 0L
     return lines.sumOf { line ->
         if (line.product.vatType == VatType.STANDARD) {
-            line.lineTotal - (line.lineTotal / STANDARD_DIVISOR).roundToInt()
+            line.lineTotalCents - (line.lineTotalCents / STANDARD_DIVISOR).roundToLong()
         } else {
-            0
+            0L
         }
     }
 }
@@ -31,14 +31,14 @@ fun vatOf(
  */
 fun discountedVat(
     lines: List<PosLine>,
-    cartDiscount: Int,
+    cartDiscountCents: Long,
     vatRegistered: Boolean,
-): Int {
-    if (!vatRegistered) return 0
-    val afterItems = lines.sumOf { it.net }
-    if (afterItems <= 0) return 0
-    val standardNet = lines.filter { it.product.vatType == VatType.STANDARD }.sumOf { it.net }
-    val cartRatio = (afterItems - cartDiscount).coerceAtLeast(0).toDouble() / afterItems
+): Long {
+    if (!vatRegistered) return 0L
+    val afterItems = lines.sumOf { it.netCents }
+    if (afterItems <= 0L) return 0L
+    val standardNet = lines.filter { it.product.vatType == VatType.STANDARD }.sumOf { it.netCents }
+    val cartRatio = (afterItems - cartDiscountCents).coerceAtLeast(0L).toDouble() / afterItems
     val standardFinal = standardNet * cartRatio
-    return (standardFinal - standardFinal / STANDARD_DIVISOR).roundToInt()
+    return (standardFinal - standardFinal / STANDARD_DIVISOR).roundToLong()
 }

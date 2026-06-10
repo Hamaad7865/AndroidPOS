@@ -27,12 +27,12 @@ data class PosProduct(
     val cat: String,
     /** The product's MAIN category name (= cat when the product sits directly under a main). */
     val mainCat: String = "",
-    val price: Int,
+    val priceCents: Long,
     val sku: String,
     val stock: Int,
     val kind: String,
     val barcode: String? = null,
-    val cost: Int = 0,
+    val costCents: Long = 0,
     val brand: String = "",
     val model: String = "",
     val unit: String = "pcs",
@@ -49,15 +49,15 @@ data class PosProduct(
 data class PosLine(
     val product: PosProduct,
     val qty: Int,
-    val discount: Int = 0,
-    /** Custom unit price for this sale only; null = the catalog price. */
-    val priceOverride: Int? = null,
+    val discountCents: Long = 0,
+    /** Custom unit price (cents) for this sale only; null = the catalog price. */
+    val priceOverrideCents: Long? = null,
 ) {
-    val effectivePrice get() = priceOverride ?: product.price
-    val lineTotal get() = effectivePrice * qty
+    val effectivePriceCents get() = priceOverrideCents ?: product.priceCents
+    val lineTotalCents get() = effectivePriceCents * qty
 
-    /** Line amount after its own discount (never negative). */
-    val net get() = (lineTotal - discount).coerceAtLeast(0)
+    /** Line amount (cents) after its own discount (never negative). */
+    val netCents get() = (lineTotalCents - discountCents).coerceAtLeast(0L)
 }
 
 /**
@@ -72,13 +72,13 @@ data class HeldTicket(
     val createdAt: Long,
     // Whole-ticket checkout state, parked so a resumed ticket round-trips exactly
     // and (critically) so it can't bleed into the next ticket after a Hold.
-    val discount: Int = 0,
+    val discountCents: Long = 0,
     val discountIsPercent: Boolean = false,
     val discountPercent: Int = 0,
-    val shipping: Int = 0,
+    val shippingCents: Long = 0,
     val note: String = "",
 ) {
-    val total: Int get() = lines.sumOf { it.lineTotal }
+    val totalCents: Long get() = lines.sumOf { it.lineTotalCents }
     val itemCount: Int get() = lines.sumOf { it.qty }
     val label: String get() = customer?.name ?: "Walk-in"
 }
@@ -86,13 +86,13 @@ data class HeldTicket(
 /** Immutable snapshot of a completed sale, consumed by the receipt screen. */
 data class SaleSnapshot(
     val lines: List<PosLine>,
-    val subtotal: Int,
-    val discount: Int,
-    val vat: Int,
-    val shipping: Int,
-    val total: Int,
-    val received: Int,
-    val change: Int,
+    val subtotalCents: Long,
+    val discountCents: Long,
+    val vatCents: Long,
+    val shippingCents: Long,
+    val totalCents: Long,
+    val receivedCents: Long,
+    val changeCents: Long,
     val pay: String,
     val invoiceNo: String,
     /** Epoch millis the sale was completed at. */
@@ -101,8 +101,8 @@ data class SaleSnapshot(
     val customerName: String = "Walk-in",
     /** Customer phone captured at sale time (for SMS/WhatsApp), or blank. */
     val customerPhone: String = "",
-    /** For credit sales: the unpaid portion the customer now owes (whole rupees). */
-    val creditDue: Int = 0,
+    /** For credit sales: the unpaid portion the customer now owes (cents). */
+    val creditDueCents: Long = 0,
     /** Free-text remark captured at the till. */
     val note: String = "",
 )
@@ -152,11 +152,11 @@ class SellingViewModel(
 
     val customerName: String get() = selectedCustomer?.name ?: "Walk-in customer"
 
-    // Checkout inputs (whole rupees)
-    var discount by mutableStateOf(0)
-    var shipping by mutableStateOf(0)
+    // Checkout inputs (cents; discountPercent is a 0..100 percent, not money)
+    var discountCents by mutableStateOf(0L)
+    var shippingCents by mutableStateOf(0L)
     var pay by mutableStateOf("cash")
-    var received by mutableStateOf(0)
+    var receivedCents by mutableStateOf(0L)
     var discountIsPercent by mutableStateOf(false)
     var discountPercent by mutableStateOf(0)
 
@@ -235,11 +235,11 @@ class SellingViewModel(
         workingLines.clear()
         selectedCustomer = null
         saleNote = ""
-        discount = 0
+        discountCents = 0L
         discountIsPercent = false
         discountPercent = 0
-        shipping = 0
-        received = 0
+        shippingCents = 0L
+        receivedCents = 0L
     }
 
     /**
@@ -262,75 +262,75 @@ class SellingViewModel(
      */
     fun applyDiscount(
         isPercent: Boolean,
-        value: Int,
+        value: Long,
     ) {
         discountIsPercent = isPercent
         if (isPercent) {
-            discountPercent = value.coerceIn(0, 100)
-            discount = percentToFlat(afterItems, discountPercent)
+            discountPercent = value.toInt().coerceIn(0, 100)
+            discountCents = percentToFlat(afterItemsCents, discountPercent)
         } else {
-            discount = value.coerceAtLeast(0)
+            discountCents = value.coerceAtLeast(0L)
             // Keep the percent representation in sync so switching to % mode (or a later
             // re-tap) never reads a stale percent and silently wipes the flat discount.
-            discountPercent = flatToPercent(afterItems, discount)
+            discountPercent = flatToPercent(afterItemsCents, discountCents)
         }
-        if (!isCredit) received = total
+        if (!isCredit) receivedCents = totalCents
     }
 
     /** Sets a line's discount from a percentage of its line total or a flat Rs amount, clamped to the line. */
     fun applyItemDiscount(
         productId: String,
         isPercent: Boolean,
-        value: Int,
+        value: Long,
     ) {
         val i = workingLines.indexOfFirst { it.product.id == productId }
         if (i < 0) return
         val line = workingLines[i]
-        val flat = if (isPercent) percentToFlat(line.lineTotal, value) else value.coerceAtLeast(0)
-        workingLines[i] = line.copy(discount = flat.coerceIn(0, line.lineTotal))
+        val flat = if (isPercent) percentToFlat(line.lineTotalCents, value.toInt()) else value.coerceAtLeast(0L)
+        workingLines[i] = line.copy(discountCents = flat.coerceIn(0L, line.lineTotalCents))
         // A cart % is stored as a flat Rs against afterItems at apply time; recompute it so
         // editing an item discount keeps "X% off the cart" honest as the base changes.
-        if (discountIsPercent) discount = percentToFlat(afterItems, discountPercent)
-        if (!isCredit) received = total
+        if (discountIsPercent) discountCents = percentToFlat(afterItemsCents, discountPercent)
+        if (!isCredit) receivedCents = totalCents
     }
 
-    /** Overrides a line's unit price for this sale (catalog price untouched). */
+    /** Overrides a line's unit price (cents) for this sale (catalog price untouched). */
     fun setLinePrice(
         productId: String,
-        priceRupees: Int,
+        priceCents: Long,
     ) {
         val i = workingLines.indexOfFirst { it.product.id == productId }
         if (i < 0) return
-        workingLines[i] = workingLines[i].copy(priceOverride = priceRupees.coerceAtLeast(0))
-        if (!isCredit) received = total
+        workingLines[i] = workingLines[i].copy(priceOverrideCents = priceCents.coerceAtLeast(0L))
+        if (!isCredit) receivedCents = totalCents
     }
 
     /** Removes every discount — cart and per-line. */
     fun clearAllDiscounts() {
-        discount = 0
+        discountCents = 0L
         discountIsPercent = false
         discountPercent = 0
         for (i in workingLines.indices) {
-            if (workingLines[i].discount != 0) workingLines[i] = workingLines[i].copy(discount = 0)
+            if (workingLines[i].discountCents != 0L) workingLines[i] = workingLines[i].copy(discountCents = 0L)
         }
-        if (!isCredit) received = total
+        if (!isCredit) receivedCents = totalCents
     }
 
     /** Restores a captured discount state (used by the dialog's Cancel). */
     fun restoreDiscounts(
-        cartDiscount: Int,
+        cartDiscountCents: Long,
         cartIsPercent: Boolean,
         cartPercent: Int,
-        lineDiscounts: Map<String, Int>,
+        lineDiscounts: Map<String, Long>,
     ) {
-        discount = cartDiscount
+        discountCents = cartDiscountCents
         discountIsPercent = cartIsPercent
         discountPercent = cartPercent
         for (i in workingLines.indices) {
-            val d = lineDiscounts[workingLines[i].product.id] ?: 0
-            if (workingLines[i].discount != d) workingLines[i] = workingLines[i].copy(discount = d)
+            val d = lineDiscounts[workingLines[i].product.id] ?: 0L
+            if (workingLines[i].discountCents != d) workingLines[i] = workingLines[i].copy(discountCents = d)
         }
-        if (!isCredit) received = total
+        if (!isCredit) receivedCents = totalCents
     }
 
     // --- Cart ------------------------------------------------------------
@@ -389,10 +389,10 @@ class SellingViewModel(
                 customer = selectedCustomer,
                 lines = workingLines.toList(),
                 createdAt = System.currentTimeMillis(),
-                discount = discount,
+                discountCents = discountCents,
                 discountIsPercent = discountIsPercent,
                 discountPercent = discountPercent,
-                shipping = shipping,
+                shippingCents = shippingCents,
                 note = saleNote,
             ),
         )
@@ -414,10 +414,10 @@ class SellingViewModel(
         heldTickets.removeAll { it.id == heldId }
         workingLines.addAll(ticket.lines)
         selectedCustomer = ticket.customer
-        discount = ticket.discount
+        discountCents = ticket.discountCents
         discountIsPercent = ticket.discountIsPercent
         discountPercent = ticket.discountPercent
-        shipping = ticket.shipping
+        shippingCents = ticket.shippingCents
         saleNote = ticket.note
     }
 
@@ -431,30 +431,30 @@ class SellingViewModel(
     /** Synced from BusinessProfile by the POS screen; gates VAT globally (off for non-VAT clients). */
     var vatRegistered: Boolean = true
 
-    val subtotal get() = workingLines.sumOf { it.lineTotal }
+    val subtotalCents get() = workingLines.sumOf { it.lineTotalCents }
 
     /** Total of the per-line (item) discounts. */
-    val itemDiscountTotal get() = workingLines.sumOf { it.discount }
+    val itemDiscountTotalCents get() = workingLines.sumOf { it.discountCents }
 
     /** Subtotal after item discounts; the base the cart discount applies to. */
-    val afterItems get() = (subtotal - itemDiscountTotal).coerceAtLeast(0)
+    val afterItemsCents get() = (subtotalCents - itemDiscountTotalCents).coerceAtLeast(0L)
 
     /**
      * Cart discount is clamped so it can never exceed the after-item subtotal
      * (prevents a free sale slipping through by a large manual discount entry).
      */
-    private val clampedDiscount get() = discount.coerceIn(0, afterItems)
+    private val clampedDiscountCents get() = discountCents.coerceIn(0L, afterItemsCents)
 
     /** Item discounts + cart discount — shown as the single "Discount" figure. */
-    val totalDiscount get() = itemDiscountTotal + clampedDiscount
+    val totalDiscountCents get() = itemDiscountTotalCents + clampedDiscountCents
 
     /** VAT embedded in the cart after all discounts, per product VAT type. */
-    val vat get() = discountedVat(workingLines, clampedDiscount, vatRegistered)
+    val vatCents get() = discountedVat(workingLines, clampedDiscountCents, vatRegistered)
 
     /** Exact payable total — prices are VAT-inclusive, so VAT is NOT added again. */
-    val total get() = (afterItems - clampedDiscount + shipping).coerceAtLeast(0)
+    val totalCents get() = (afterItemsCents - clampedDiscountCents + shippingCents).coerceAtLeast(0L)
 
-    val change get() = received - total
+    val changeCents get() = receivedCents - totalCents
 
     /** True when the selected payment type is "credit". */
     val isCredit get() = pay == "credit"
@@ -463,7 +463,7 @@ class SellingViewModel(
      * For a credit sale, the unpaid portion the customer will owe = total − received
      * (received may be 0 for full credit, or a partial down-payment). 0 otherwise.
      */
-    val creditDue get() = if (isCredit) (total - received).coerceAtLeast(0) else 0
+    val creditDueCents get() = if (isCredit) (totalCents - receivedCents).coerceAtLeast(0L) else 0L
 
     /** Credit sales must be attached to a customer — walk-in credit is not allowed. */
     val creditNeedsCustomer get() = isCredit && selectedCustomer == null
@@ -472,7 +472,7 @@ class SellingViewModel(
      * A non-credit sale must have received >= total before it can complete.
      * Credit sales always satisfy this condition (partial payment is allowed on credit).
      */
-    val isFullyTendered get() = isCredit || received >= total
+    val isFullyTendered get() = isCredit || receivedCents >= totalCents
 
     /** The "Complete sale" button is enabled only when the ticket can legally close. */
     val canComplete: Boolean
@@ -485,15 +485,15 @@ class SellingViewModel(
 
     /** Called when the cashier presses Charge; resets inputs and defaults tender to total. */
     fun beginCheckout() {
-        discount = 0
+        discountCents = 0L
         discountIsPercent = false
         discountPercent = 0
         for (i in workingLines.indices) {
-            if (workingLines[i].discount != 0) workingLines[i] = workingLines[i].copy(discount = 0)
+            if (workingLines[i].discountCents != 0L) workingLines[i] = workingLines[i].copy(discountCents = 0L)
         }
-        shipping = 0
+        shippingCents = 0L
         pay = "cash"
-        received = total
+        receivedCents = totalCents
     }
 
     /**
@@ -503,17 +503,19 @@ class SellingViewModel(
      */
     fun setPaymentType(id: String) {
         pay = id
-        received = if (id == "credit") 0 else total
+        receivedCents = if (id == "credit") 0L else totalCents
     }
 
-    /** On-screen keypad handler (digits, clear, backspace). */
+    /** On-screen keypad handler (digits, clear, backspace) — enters whole rupees of tender. */
     fun pressKey(key: String) {
-        received =
+        val rupees = receivedCents / CENTS_PER_RUPEE
+        val newRupees =
             when (key) {
-                "C" -> 0
-                "<" -> received.toString().dropLast(1).toIntOrNull() ?: 0
-                else -> (received.toString() + key).toIntOrNull() ?: received
+                "C" -> 0L
+                "<" -> rupees.toString().dropLast(1).toLongOrNull() ?: 0L
+                else -> (rupees.toString() + key).toLongOrNull() ?: rupees
             }
+        receivedCents = newRupees * CENTS_PER_RUPEE
     }
 
     /**
@@ -524,17 +526,17 @@ class SellingViewModel(
     fun complete() {
         // Guard: empty cart, credit without customer, or underpaid non-credit sale.
         if (!canComplete) return
-        val effectiveDiscount = clampedDiscount
+        val effectiveDiscountCents = clampedDiscountCents
         val snapshot =
             SaleSnapshot(
                 lines = workingLines.toList(),
-                subtotal = subtotal,
-                discount = effectiveDiscount,
-                vat = vat,
-                shipping = shipping,
-                total = total,
-                received = received,
-                change = change,
+                subtotalCents = subtotalCents,
+                discountCents = effectiveDiscountCents,
+                vatCents = vatCents,
+                shippingCents = shippingCents,
+                totalCents = totalCents,
+                receivedCents = receivedCents,
+                changeCents = changeCents,
                 pay = pay,
                 // invoiceNo is a placeholder; the real one comes back from persist() async.
                 // nextInvoiceNo shows the DB-derived preview until we update it after commit.
@@ -542,7 +544,7 @@ class SellingViewModel(
                 createdAt = System.currentTimeMillis(),
                 customerName = selectedCustomer?.name ?: "Walk-in",
                 customerPhone = selectedCustomer?.phone.orEmpty(),
-                creditDue = creditDue,
+                creditDueCents = creditDueCents,
                 note = saleNote.trim(),
             )
         lastSale = snapshot
@@ -566,15 +568,15 @@ class SellingViewModel(
                 // receiptNo will be overwritten inside the DB transaction
                 receiptNo = "",
                 createdAt = snapshot.createdAt,
-                subtotalCents = snapshot.subtotal * CENTS_PER_RUPEE,
-                taxCents = snapshot.vat * CENTS_PER_RUPEE,
+                subtotalCents = snapshot.subtotalCents,
+                taxCents = snapshot.vatCents,
                 // Persist the TOTAL discount (cart + per-line) so subtotal − discount reconciles
                 // with the total and matches the printed receipt; per-line amounts also live on SaleItem.
-                discountCents = (snapshot.discount + snapshot.lines.sumOf { it.discount }) * CENTS_PER_RUPEE,
-                totalCents = snapshot.total * CENTS_PER_RUPEE,
+                discountCents = snapshot.discountCents + snapshot.lines.sumOf { it.discountCents },
+                totalCents = snapshot.totalCents,
                 paymentMethod = snapshot.pay.uppercase(),
-                amountTenderedCents = snapshot.received * CENTS_PER_RUPEE,
-                changeCents = snapshot.change.coerceAtLeast(0) * CENTS_PER_RUPEE,
+                amountTenderedCents = snapshot.receivedCents,
+                changeCents = snapshot.changeCents.coerceAtLeast(0L),
                 customerId = customer?.id,
                 customerName = customer?.name ?: snapshot.customerName,
                 note = snapshot.note,
@@ -588,10 +590,10 @@ class SellingViewModel(
                     saleId = 0,
                     productId = line.product.id.toLongOrNull(),
                     nameSnapshot = line.product.name,
-                    unitPriceCents = line.effectivePrice * CENTS_PER_RUPEE,
+                    unitPriceCents = line.effectivePriceCents,
                     quantity = line.qty,
-                    lineTotalCents = line.lineTotal * CENTS_PER_RUPEE,
-                    discountCents = line.discount * CENTS_PER_RUPEE,
+                    lineTotalCents = line.lineTotalCents,
+                    discountCents = line.discountCents,
                 )
             }
         // Build the guarded stock-delta map (only for products with a known DB id).
@@ -601,7 +603,7 @@ class SellingViewModel(
                 .toMap()
         val creditCustomerId = if (snapshot.pay == "credit") customer?.id else null
         val creditDeltaCents =
-            if (snapshot.pay == "credit") snapshot.creditDue.toLong() * CENTS_PER_RUPEE else 0L
+            if (snapshot.pay == "credit") snapshot.creditDueCents else 0L
         viewModelScope.launch {
             try {
                 salesRepository.checkout(
