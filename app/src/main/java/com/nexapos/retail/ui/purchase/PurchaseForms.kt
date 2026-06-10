@@ -117,10 +117,11 @@ fun AddPurchaseScreen(
 
     val subtotal = items.sumOf { it.quantity * it.unitCostCents }
     var discountIsPercent by remember { mutableStateOf(false) }
-    var discountValue by remember { mutableStateOf(0) }
-    // discountValue is a percent, or a whole-rupee flat amount — resolve to cents.
+    // Percent (0..100) and flat (cents) are tracked separately so each mode keeps its own value.
+    var discountPercent by remember { mutableStateOf(0) }
+    var discountFlatCents by remember { mutableStateOf(0L) }
     val discountFlat =
-        (if (discountIsPercent) subtotal * discountValue / 100 else discountValue * CENTS_PER_RUPEE)
+        (if (discountIsPercent) subtotal * discountPercent / 100 else discountFlatCents)
             .coerceIn(0L, subtotal)
     val total = subtotal - discountFlat
     val canConfirm = supplierName.isNotBlank() && items.isNotEmpty()
@@ -360,8 +361,20 @@ fun AddPurchaseScreen(
                 ) {
                     if (!discountIsPercent) Text("Rs", fontSize = 13.sp, color = c.muted)
                     BasicTextField(
-                        value = if (discountValue == 0) "" else discountValue.toString(),
-                        onValueChange = { discountValue = it.toIntOrNull() ?: 0 },
+                        // Percent mode is a 0..100 integer; Rs mode is a decimal amount → cents.
+                        value =
+                            if (discountIsPercent) {
+                                if (discountPercent == 0) "" else discountPercent.toString()
+                            } else {
+                                Money.toInput(discountFlatCents)
+                            },
+                        onValueChange = {
+                            if (discountIsPercent) {
+                                discountPercent = it.filter { ch -> ch.isDigit() }.toIntOrNull() ?: 0
+                            } else {
+                                discountFlatCents = Money.parseToCents(it) ?: 0L
+                            }
+                        },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                         textStyle = TextStyle(fontFamily = JetBrainsMono, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End),
@@ -905,5 +918,3 @@ private fun DiscMode(
         Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selected) c.surface else c.ink)
     }
 }
-
-private const val CENTS_PER_RUPEE = 100L
