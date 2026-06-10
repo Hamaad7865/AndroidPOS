@@ -77,11 +77,11 @@ class AppContainer(context: Context) {
     }
 
     val purchasesRepository: PurchasesRepository by lazy {
-        RoomPurchasesRepository(database.purchaseDao(), database.productDao())
+        RoomPurchasesRepository(database.purchaseDao())
     }
 
     val returnsRepository: ReturnsRepository by lazy {
-        RoomReturnsRepository(database.saleReturnDao(), database.productDao(), database.partyDao())
+        RoomReturnsRepository(database.saleReturnDao())
     }
 
     val staffRepository: StaffRepository by lazy {

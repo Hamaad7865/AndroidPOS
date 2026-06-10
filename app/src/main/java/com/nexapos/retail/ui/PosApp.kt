@@ -98,10 +98,12 @@ fun PosApp() {
                         }
                     }
                     id in MODULE_ROUTES -> {
+                        // No saveState/restoreState: a module always re-opens fresh, so one
+                        // staff member's saved screen/form state can never be restored into
+                        // the next staff member's session after a sign-out.
                         navController.navigate(id) {
                             launchSingleTop = true
-                            popUpTo("home") { saveState = true }
-                            restoreState = true
+                            popUpTo("home")
                         }
                     }
                     else -> {

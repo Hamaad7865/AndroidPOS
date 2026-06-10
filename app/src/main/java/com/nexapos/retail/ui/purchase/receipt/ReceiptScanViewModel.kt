@@ -96,21 +96,29 @@ class ReceiptScanViewModel(
         lines.clear()
     }
 
+    private var registering = false
+
     fun register(onDone: () -> Unit) {
+        if (registering) return // ignore double-taps while the first save is in flight
         val valid = lines.filter { it.name.isNotBlank() && it.quantity > 0 && it.unitCostRupees > 0 }
         if (supplier.isBlank() || valid.isEmpty()) return
+        registering = true
         viewModelScope.launch {
-            recordPurchaseFromDraft(
-                purchasesRepository,
-                catalogRepository,
-                partiesRepository,
-                supplierName = supplier,
-                paymentMethod = "cash",
-                items = valid.map { PurchaseDraftItem(it.name, it.quantity, it.unitCostRupees) },
-                notes = "From scanned receipt",
-            )
-            phase = ScanPhase.DONE
-            onDone()
+            try {
+                recordPurchaseFromDraft(
+                    purchasesRepository,
+                    catalogRepository,
+                    partiesRepository,
+                    supplierName = supplier,
+                    paymentMethod = "cash",
+                    items = valid.map { PurchaseDraftItem(it.name, it.quantity, it.unitCostRupees) },
+                    notes = "From scanned receipt",
+                )
+                phase = ScanPhase.DONE
+                onDone()
+            } finally {
+                registering = false
+            }
         }
     }
 }

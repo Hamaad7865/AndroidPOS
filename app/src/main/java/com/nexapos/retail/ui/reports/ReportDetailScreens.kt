@@ -686,8 +686,10 @@ private fun ProfitLossReport(vm: ReportsViewModel) {
     val revenue = (periodSales.sumOf { it.totalCents } / 100).toInt()
     val cogs = vm.cogsRupees(periodSales)
     val gross = revenue - cogs
-    val incomeR = vm.moneyInRange(r.from, r.to, MoneyTxn.TYPE_INCOME).sumOf { (it.amountCents / 100).toInt() }
-    val expenseR = vm.moneyInRange(r.from, r.to, MoneyTxn.TYPE_EXPENSE).sumOf { (it.amountCents / 100).toInt() }
+    // Sum cents THEN convert to rupees (like `revenue` above) so the net reconciles
+    // with the revenue line instead of dropping up to Rs 0.99 per row.
+    val incomeR = (vm.moneyInRange(r.from, r.to, MoneyTxn.TYPE_INCOME).sumOf { it.amountCents } / 100).toInt()
+    val expenseR = (vm.moneyInRange(r.from, r.to, MoneyTxn.TYPE_EXPENSE).sumOf { it.amountCents } / 100).toInt()
     val net = gross + incomeR - expenseR
     val data =
         ReportData(

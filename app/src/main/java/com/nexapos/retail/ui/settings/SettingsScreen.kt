@@ -426,12 +426,27 @@ private fun DataSecurityCard(admin: Boolean) {
             onDismiss = { showKeyPinGate = false },
             onVerified = { enteredPin ->
                 scope.launch {
-                    val ok =
+                    // The recovery key decrypts the whole DB, so this admin-PIN gate must
+                    // honour the same brute-force lockout as the login screen.
+                    if (PinManager.lockoutRemainingMs(context) > 0) {
+                        message = "Too many attempts — try again shortly."
+                        showKeyPinGate = false
+                        return@launch
+                    }
+                    val granted =
                         withContext(Dispatchers.Default) {
                             val staff = container.staffRepository.findByPin(enteredPin)
-                            if (staff != null) staff.isAdmin() else PinManager.verify(context, enteredPin)
+                            when {
+                                // Valid staff PIN: admins pass; anyone else is a failed attempt.
+                                staff != null ->
+                                    staff.isAdmin().also { ok ->
+                                        if (ok) PinManager.noteSuccess(context) else PinManager.noteFailedAttempt(context)
+                                    }
+                                // No staff matched → legacy shop PIN, which records its own result.
+                                else -> PinManager.verify(context, enteredPin)
+                            }
                         }
-                    if (ok) {
+                    if (granted) {
                         showKeyPinGate = false
                         showKey = true
                     } else {

@@ -16,14 +16,43 @@ interface SaleReturnDao {
     @Insert
     suspend fun insertItems(items: List<SaleReturnItem>)
 
-    /** Records a return and its line items atomically; returns the new return id. */
+    /** Restocks a returned line. Positive [delta] adds the quantity back. */
+    @Query("UPDATE products SET stockQty = stockQty + :delta WHERE id = :id")
+    suspend fun restock(
+        id: Long,
+        delta: Int,
+    )
+
+    /** Reduces a credit customer's balance by a cash-equivalent refund. */
+    @Query("UPDATE parties SET balanceCents = balanceCents + :deltaCents WHERE id = :id")
+    suspend fun bumpPartyBalance(
+        id: Long,
+        deltaCents: Long,
+    )
+
+    /**
+     * Records a return + its items, restocks every returned line, and (for a
+     * credit refund) reduces the customer's balance — all in ONE transaction, so
+     * a crash mid-way can never leave stock or balances half-adjusted.
+     *
+     * @param stockDeltas      productId → quantity to add back to stock.
+     * @param creditCustomerId customer to credit on a CREDIT refund, else null.
+     * @param creditRefundCents amount to REDUCE the customer's balance by (>0).
+     */
     @Transaction
     suspend fun recordReturn(
         saleReturn: SaleReturn,
         items: List<SaleReturnItem>,
+        stockDeltas: Map<Long, Int>,
+        creditCustomerId: Long?,
+        creditRefundCents: Long,
     ): Long {
         val returnId = insertReturn(saleReturn)
         insertItems(items.map { it.copy(returnId = returnId) })
+        stockDeltas.forEach { (productId, delta) -> restock(productId, delta) }
+        if (creditCustomerId != null && creditRefundCents > 0) {
+            bumpPartyBalance(creditCustomerId, -creditRefundCents)
+        }
         return returnId
     }
 

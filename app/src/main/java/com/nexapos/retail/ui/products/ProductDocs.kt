@@ -2,6 +2,7 @@ package com.nexapos.retail.ui.products
 
 import com.nexapos.retail.data.barcode.Ean13
 import com.nexapos.retail.ui.sale.PosProduct
+import com.nexapos.retail.util.csvCell
 
 /**
  * Pure document builders for the Products screen — kept free of Android/Compose
@@ -50,12 +51,6 @@ internal fun productsCsv(
         sb.append(row.joinToString(",") { csvCell(it) }).append("\r\n")
     }
     return sb.toString()
-}
-
-private fun csvCell(raw: String): String {
-    val needsQuote = raw.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
-    val escaped = raw.replace("\"", "\"\"")
-    return if (needsQuote) "\"$escaped\"" else escaped
 }
 
 // ---------------------------------------------------------------------------
