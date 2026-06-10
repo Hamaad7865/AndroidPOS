@@ -12,7 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 
 private const val TAG = "DrawerKicker"
 private const val KICK_TIMEOUT_MS = 3_000L
@@ -62,8 +62,16 @@ class EscPosDrawerKicker(private val context: Context) : DrawerKicker {
             withTimeoutOrNull(KICK_TIMEOUT_MS) { transport.send(pulse) }
                 ?: return KickResult.Failed("Timed out reaching the printer")
             KickResult.Sent
-        } catch (e: IOException) {
-            KickResult.Failed(e.message ?: "Could not reach the printer")
+        } catch (e: CancellationException) {
+            throw e // never swallow coroutine cancellation
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            // HARD INVARIANT: a drawer fault must never crash or block a sale.
+            // A mistyped LAN port or malformed Bluetooth MAC throws
+            // IllegalArgumentException, the BT/USB stack can throw other runtime
+            // errors — all surface here as a logged failure, not an app crash.
+            KickResult.Failed(e.message ?: "Could not open the drawer")
         }
     }
 

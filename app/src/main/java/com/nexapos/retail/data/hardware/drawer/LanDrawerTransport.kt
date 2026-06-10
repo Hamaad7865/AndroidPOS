@@ -16,6 +16,10 @@ internal class LanDrawerTransport(
 ) : DrawerTransport {
     override suspend fun send(bytes: ByteArray) {
         if (host.isBlank()) throw IOException("No printer address configured")
+        // A mistyped port would otherwise make InetSocketAddress throw an
+        // IllegalArgumentException — convert it to a handled IOException so a
+        // bad setting never crashes the sale that triggered the kick.
+        if (port !in 1..65535) throw IOException("Printer port $port is out of range (1–65535)")
         Socket().use { socket ->
             socket.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
             socket.getOutputStream().apply {
