@@ -75,6 +75,10 @@ class ShiftViewModel(
         error = null
     }
 
+    // Single-flight guard: a fast double-tap on Open/Close must not launch two
+    // concurrent shift operations.
+    private var busy = false
+
     /** Opens a shift for the signed-in staff with [floatCents] in the drawer. */
     fun open(floatCents: Long) {
         val staff = session.current.value
@@ -82,19 +86,22 @@ class ShiftViewModel(
             error = "Sign in before opening a shift."
             return
         }
+        if (busy) return
+        busy = true
         viewModelScope.launch {
-            error =
-                try {
-                    shiftRepository.openShift(
-                        staffId = staff.id,
-                        staffName = staff.name,
-                        openingFloatCents = floatCents,
-                    )
-                    justClosed = null
-                    null
-                } catch (e: IllegalStateException) {
-                    e.message
-                }
+            try {
+                shiftRepository.openShift(
+                    staffId = staff.id,
+                    staffName = staff.name,
+                    openingFloatCents = floatCents,
+                )
+                justClosed = null
+                error = null
+            } catch (e: IllegalStateException) {
+                error = e.message
+            } finally {
+                busy = false
+            }
         }
     }
 
@@ -104,19 +111,22 @@ class ShiftViewModel(
         note: String,
     ) {
         val shift = openShift.value ?: return
+        if (busy) return
+        busy = true
         viewModelScope.launch {
-            error =
-                try {
-                    shiftRepository.closeShift(
-                        shiftId = shift.id,
-                        declaredCashCents = countedCents,
-                        note = note,
-                    )
-                    justClosed = shiftRepository.summary(shift.id)
-                    null
-                } catch (e: IllegalStateException) {
-                    e.message
-                }
+            try {
+                shiftRepository.closeShift(
+                    shiftId = shift.id,
+                    declaredCashCents = countedCents,
+                    note = note,
+                )
+                justClosed = shiftRepository.summary(shift.id)
+                error = null
+            } catch (e: IllegalStateException) {
+                error = e.message
+            } finally {
+                busy = false
+            }
         }
     }
 

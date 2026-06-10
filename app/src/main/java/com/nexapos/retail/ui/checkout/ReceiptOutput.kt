@@ -41,6 +41,9 @@ import java.util.Locale
 object ReceiptOutput {
     private val dateFmt = SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.US)
 
+    /** How long a shared receipt PDF lingers in the cache before it's pruned. */
+    private const val SHARE_CACHE_TTL_MS = 10 * 60 * 1000L
+
     private fun money(cents: Long) = Money.format(cents)
 
     // -----------------------------------------------------------------------
@@ -287,6 +290,10 @@ object ReceiptOutput {
         doc.finishPage(page)
 
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        // Prune previously-shared receipts so the cache can't grow unbounded;
+        // keep very recent ones in case a share sheet is still reading them.
+        val cutoff = System.currentTimeMillis() - SHARE_CACHE_TTL_MS
+        dir.listFiles()?.forEach { if (it.lastModified() < cutoff) it.delete() }
         val file = File(dir, "receipt-${sale.invoiceNo}.pdf")
         FileOutputStream(file).use { doc.writeTo(it) }
         doc.close()
