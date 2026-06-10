@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nexapos.retail.PosApplication
 import com.nexapos.retail.data.profile.BusinessProfile
@@ -57,6 +58,9 @@ import kotlinx.coroutines.withContext
  */
 private val MODULE_ROUTES =
     setOf("home", "pos", "products", "parties", "purchase", "money", "income", "expense", "ledger", "reports", "settings")
+
+/** Screens reachable WITHOUT a signed-in staff member. Everything else is guarded. */
+private val PUBLIC_ROUTES = setOf("splash", "login", "setup")
 
 /**
  * Root navigation. A single [SellingViewModel] is shared so the cart carries
@@ -134,6 +138,20 @@ fun PosApp() {
                 }
             }
         }
+
+    // Defence in depth: if the OS restores the app onto a protected screen after
+    // process death — when the in-memory session is gone — force a fresh sign-in
+    // so data can't render for nobody. Public routes (splash/login/setup) are exempt.
+    val signedIn by (appContext.applicationContext as PosApplication).container.session.current.collectAsState()
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    LaunchedEffect(signedIn, currentRoute) {
+        val base = currentRoute?.substringBefore('/')?.substringBefore('?')
+        if (signedIn == null && base != null && base !in PUBLIC_ROUTES) {
+            navController.navigate("login") {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = "splash") {
         composable("splash") {

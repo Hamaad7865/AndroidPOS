@@ -313,27 +313,36 @@ fun BusinessSetupScreen(
     val pinOk = pinValid && pin == confirmPin
     val canSave = name.isNotBlank() && pinOk
     val scope = rememberCoroutineScope()
+    // Guards against a double-tap creating two "Owner" admins before the first
+    // addStaff finishes (the activeStaff()==empty check is otherwise racy).
+    var saving by remember { mutableStateOf(false) }
 
     fun save() {
+        if (saving) return
+        saving = true
         BusinessProfile.setProfile(context, name, address, brn, vat)
         PinManager.setPin(context, pin.trim())
         // The person doing first-run setup is the owner: record them as the
         // shop's admin so roles work from the very first sign-in.
         val container = (context.applicationContext as PosApplication).container
         scope.launch {
-            val owner =
-                withContext(Dispatchers.Default) {
-                    val repo = container.staffRepository
-                    if (repo.activeStaff().isEmpty()) {
-                        repo.addStaff(name = "Owner", pin = pin.trim(), role = StaffRole.ADMIN)
-                    } else {
-                        // Setup re-ran on a shop that already has staff: don't create
-                        // a duplicate owner — sign in whoever this PIN belongs to.
-                        repo.findByPin(pin.trim())
+            try {
+                val owner =
+                    withContext(Dispatchers.Default) {
+                        val repo = container.staffRepository
+                        if (repo.activeStaff().isEmpty()) {
+                            repo.addStaff(name = "Owner", pin = pin.trim(), role = StaffRole.ADMIN)
+                        } else {
+                            // Setup re-ran on a shop that already has staff: don't create
+                            // a duplicate owner — sign in whoever this PIN belongs to.
+                            repo.findByPin(pin.trim())
+                        }
                     }
-                }
-            if (owner != null) container.session.login(owner)
-            onDone()
+                if (owner != null) container.session.login(owner)
+                onDone()
+            } finally {
+                saving = false
+            }
         }
     }
 

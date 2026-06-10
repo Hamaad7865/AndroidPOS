@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +77,9 @@ import com.nexapos.retail.ui.session.rememberIsAdmin
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private fun rs(n: Int) = "Rs " + formatNum(n.toDouble(), 0)
 
@@ -655,19 +659,23 @@ fun AddProductScreen(
                 lowStock = p.lowStockThreshold.toString()
                 vatType = VatType.from(p.vatType)
                 imageName = p.imagePath
-                imageBitmap = ImageStore.load(context, p.imagePath)
+                imageBitmap = withContext(Dispatchers.IO) { ImageStore.load(context, p.imagePath) }
             }
             loaded = true
         }
     }
 
+    val scope = rememberCoroutineScope()
     val imagePicker =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
-                val saved = ImageStore.save(context, uri, sku.ifBlank { "product" })
-                if (saved != null) {
-                    imageName = saved
-                    imageBitmap = ImageStore.load(context, saved)
+                // Decode + downscale + JPEG-compress off the main thread (ANR risk).
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) { ImageStore.save(context, uri, sku.ifBlank { "product" }) }
+                    if (saved != null) {
+                        imageName = saved
+                        imageBitmap = withContext(Dispatchers.IO) { ImageStore.load(context, saved) }
+                    }
                 }
             }
         }

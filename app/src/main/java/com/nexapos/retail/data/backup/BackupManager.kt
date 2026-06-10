@@ -93,9 +93,14 @@ object BackupManager {
             File("${live.path}-wal").delete()
             File("${live.path}-shm").delete()
 
-            // Copy staged → temp, then atomically rename into place.
+            // Copy staged → temp, then atomically rename into place. If the rename
+            // fails (it returns false, never throws), fall back to a copy so a
+            // failed swap is never reported as a successful restore.
             staged.copyTo(temp, overwrite = true)
-            temp.renameTo(live)
+            if (!temp.renameTo(live)) {
+                temp.copyTo(live, overwrite = true)
+                temp.delete()
+            }
             return true
         } catch (e: Exception) {
             temp.delete()

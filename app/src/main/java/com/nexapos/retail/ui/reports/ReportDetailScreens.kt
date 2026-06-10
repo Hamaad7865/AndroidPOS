@@ -170,21 +170,23 @@ private fun rangeFor(period: Period): Range {
     val now = System.currentTimeMillis()
     val cal = Calendar.getInstance()
     return when (period) {
+        // Upper bound is "now", not Long.MAX_VALUE, so a future-dated row (clock
+        // skew, a back-office entry stamped ahead) can't leak into this period.
         Period.TODAY -> {
             cal.set(Calendar.HOUR_OF_DAY, 0)
             cal.set(Calendar.MINUTE, 0)
             cal.set(Calendar.SECOND, 0)
             cal.set(Calendar.MILLISECOND, 0)
-            Range(cal.timeInMillis, Long.MAX_VALUE)
+            Range(cal.timeInMillis, now)
         }
-        Period.WEEK -> Range(now - SEVEN_DAYS_MS, Long.MAX_VALUE)
+        Period.WEEK -> Range(now - SEVEN_DAYS_MS, now)
         Period.MONTH -> {
             cal.set(Calendar.DAY_OF_MONTH, 1)
             cal.set(Calendar.HOUR_OF_DAY, 0)
             cal.set(Calendar.MINUTE, 0)
             cal.set(Calendar.SECOND, 0)
             cal.set(Calendar.MILLISECOND, 0)
-            Range(cal.timeInMillis, Long.MAX_VALUE)
+            Range(cal.timeInMillis, now)
         }
         Period.ALL -> Range(0L, Long.MAX_VALUE)
     }
@@ -856,7 +858,8 @@ private fun TaxReport(vm: ReportsViewModel) {
                     s.receiptNo,
                     rsStr(grossR),
                     rsStr(vatR),
-                    rsStr(grossR - vatR),
+                    // Net from cents so the column doesn't lose a rupee to double-rounding.
+                    rsStr(((s.totalCents - s.taxCents) / 100).toInt()),
                 )
             }
         }

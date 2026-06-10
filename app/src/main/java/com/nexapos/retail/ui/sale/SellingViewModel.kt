@@ -70,6 +70,13 @@ data class HeldTicket(
     val customer: Party?,
     val lines: List<PosLine>,
     val createdAt: Long,
+    // Whole-ticket checkout state, parked so a resumed ticket round-trips exactly
+    // and (critically) so it can't bleed into the next ticket after a Hold.
+    val discount: Int = 0,
+    val discountIsPercent: Boolean = false,
+    val discountPercent: Int = 0,
+    val shipping: Int = 0,
+    val note: String = "",
 ) {
     val total: Int get() = lines.sumOf { it.lineTotal }
     val itemCount: Int get() = lines.sumOf { it.qty }
@@ -382,13 +389,16 @@ class SellingViewModel(
                 customer = selectedCustomer,
                 lines = workingLines.toList(),
                 createdAt = System.currentTimeMillis(),
+                discount = discount,
+                discountIsPercent = discountIsPercent,
+                discountPercent = discountPercent,
+                shipping = shipping,
+                note = saleNote,
             ),
         )
-        workingLines.clear()
-        selectedCustomer = null
-        discount = 0
-        shipping = 0
-        received = 0
+        // Full reset (incl. note + percent-discount) so nothing leaks into the
+        // next ticket the cashier rings up.
+        startNewTicket()
     }
 
     /**
@@ -401,9 +411,14 @@ class SellingViewModel(
         if (idx < 0) return
         val ticket = heldTickets[idx]
         if (workingLines.isNotEmpty()) holdCurrentTicket()
-        heldTickets.removeAt(heldTickets.indexOfFirst { it.id == heldId })
+        heldTickets.removeAll { it.id == heldId }
         workingLines.addAll(ticket.lines)
         selectedCustomer = ticket.customer
+        discount = ticket.discount
+        discountIsPercent = ticket.discountIsPercent
+        discountPercent = ticket.discountPercent
+        shipping = ticket.shipping
+        saleNote = ticket.note
     }
 
     /** Discards a parked ticket without resuming it (with a confirmation in the UI). */

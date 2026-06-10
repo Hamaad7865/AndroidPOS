@@ -19,11 +19,16 @@ class RoomStaffRepository(private val staffDao: StaffDao) : StaffRepository {
     override suspend fun activeStaff(): List<Staff> = staffDao.active()
 
     override suspend fun findByPin(pin: String): Staff? =
-        staffDao.active().firstOrNull { staff ->
-            val salt = Base64.decode(staff.pinSalt, Base64.NO_WRAP)
-            val expected = Base64.decode(staff.pinHash, Base64.NO_WRAP)
-            PinHasher.constantTimeEquals(expected, PinHasher.hash(pin, salt))
-        }
+        staffDao.active().firstOrNull { pinMatches(pin, it) }
+
+    private fun pinMatches(
+        pin: String,
+        staff: Staff,
+    ): Boolean {
+        val salt = Base64.decode(staff.pinSalt, Base64.NO_WRAP)
+        val expected = Base64.decode(staff.pinHash, Base64.NO_WRAP)
+        return PinHasher.constantTimeEquals(expected, PinHasher.hash(pin, salt))
+    }
 
     override suspend fun addStaff(
         name: String,
@@ -92,12 +97,16 @@ class RoomStaffRepository(private val staffDao: StaffDao) : StaffRepository {
         staffDao.update(staff.copy(active = active))
     }
 
-    /** PINs are identity at login — a duplicate would sign in as the wrong person. */
+    /**
+     * PINs are identity at login — a duplicate would sign in as the wrong person.
+     * Checks ALL staff, including deactivated ones, so a PIN can't be handed to a
+     * new member and then collide when a dormant member is reactivated.
+     */
     private suspend fun requirePinFree(
         pin: String,
         exceptId: Long?,
     ) {
-        val holder = findByPin(pin)
+        val holder = staffDao.all().firstOrNull { pinMatches(pin, it) }
         require(holder == null || holder.id == exceptId) {
             "That PIN is already used by ${holder?.name}. Pick a different one."
         }
