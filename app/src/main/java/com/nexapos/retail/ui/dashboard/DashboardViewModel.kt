@@ -41,7 +41,7 @@ class DashboardViewModel(
     // Derived properties are computed once when the products flow emits and stored in
     // Compose state so each composable snapshot reads a stable value, not a fresh
     // O(n) accumulation on every recompose.
-    var stockValue: Int by mutableStateOf(0)
+    var stockValueCents: Long by mutableStateOf(0L)
         private set
 
     var itemCount: Int by mutableStateOf(0)
@@ -68,17 +68,12 @@ class DashboardViewModel(
                 itemCount = list.size
                 lowStockCount = low.size
                 lowStockItems = low
-                stockValue =
-                    list.sumOf { it.priceCents * it.stockQty }
-                        .let { (it / CENTS_PER_RUPEE).toInt() }
+                stockValueCents = list.sumOf { it.priceCents * it.stockQty }
             }
         }
         viewModelScope.launch { catalogRepository.observeCategories().collect { cats -> categoryCount = cats.count { it.parentId == null } } }
         viewModelScope.launch { partiesRepository.observeSupplierCount().collect { supplierCount = it } }
     }
-
-    val todaySales: Int get() = (todaySalesCents / CENTS_PER_RUPEE).toInt()
-    val salesWeek: Int get() = (weekSalesCents / CENTS_PER_RUPEE).toInt()
 
     private fun startOfDay(): Long {
         val cal = Calendar.getInstance()
@@ -90,7 +85,6 @@ class DashboardViewModel(
     }
 
     private companion object {
-        const val CENTS_PER_RUPEE = 100L
         const val SEVEN_DAYS_MS = 7L * 24 * 60 * 60 * 1000
     }
 }

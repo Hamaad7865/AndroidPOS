@@ -43,6 +43,7 @@ import com.nexapos.retail.ui.components.PosIcon
 import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 
 @Composable
 fun DashboardScreen(
@@ -94,10 +95,10 @@ fun DashboardScreen(
             ShiftStatusBanner(onNav)
             // KPI band — real numbers only; trends/sparks appear once history exists.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                StatCard("Today's Sales", vm.todaySales, null, c.amber, PosIcons.cart, emptyList(), Modifier.weight(1f))
-                StatCard("Stock Value", vm.stockValue, null, c.ink, PosIcons.box, emptyList(), Modifier.weight(1f))
+                StatCard("Today's Sales", 0, null, c.amber, PosIcons.cart, emptyList(), Modifier.weight(1f), valueCents = vm.todaySalesCents)
+                StatCard("Stock Value", 0, null, c.ink, PosIcons.box, emptyList(), Modifier.weight(1f), valueCents = vm.stockValueCents)
                 StatCard("Tickets today", vm.todayCount, null, c.graphite, PosIcons.receipt, emptyList(), Modifier.weight(1f), prefix = "")
-                StatCard("Sales (week)", vm.salesWeek, null, c.emerald, PosIcons.chart, emptyList(), Modifier.weight(1f))
+                StatCard("Sales (week)", 0, null, c.emerald, PosIcons.chart, emptyList(), Modifier.weight(1f), valueCents = vm.weekSalesCents)
             }
 
             // Chart + top movers — placeholders until aggregations are wired
@@ -225,7 +226,7 @@ private fun LiveActivityCard(
                         )
                     }
                     Text(
-                        "Rs " + (sale.totalCents / 100),
+                        Money.format(sale.totalCents),
                         fontFamily = JetBrainsMono,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -337,6 +338,8 @@ private fun StatCard(
     modifier: Modifier = Modifier,
     prefix: String = "Rs ",
     sub: String? = null,
+    /** When set, the card shows this exact money amount (cents) with 2 decimals. */
+    valueCents: Long? = null,
 ) {
     val c = PosTheme.colors
     Machined(modifier) {
@@ -348,7 +351,11 @@ private fun StatCard(
         }
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            CountUp(value.toDouble(), prefix = prefix, decimals = 0, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
+            if (valueCents != null) {
+                CountUp(valueCents / 100.0, prefix = prefix, decimals = 2, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
+            } else {
+                CountUp(value.toDouble(), prefix = prefix, decimals = 0, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = c.ink)
+            }
             if (sub != null) {
                 Spacer(Modifier.width(6.dp))
                 Text(sub, fontSize = 15.sp, color = c.muted, fontWeight = FontWeight.Bold)
