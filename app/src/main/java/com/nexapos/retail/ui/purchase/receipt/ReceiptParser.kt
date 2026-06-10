@@ -1,5 +1,7 @@
 package com.nexapos.retail.ui.purchase.receipt
 
+import com.nexapos.retail.util.Money
+
 /**
  * Best-effort extraction of supplier + line items from a receipt's OCR lines.
  *
@@ -99,7 +101,7 @@ object ReceiptParser {
                 val name = descCol[i].text.trim()
                 val unitCost = parseMoney(priceCol[i].text)
                 val qty = qtyCol.getOrNull(i)?.text?.let(::parseQty) ?: 1
-                if (name.length >= 2 && unitCost > 0) ReceiptDraftLine(name, qty, unitCost) else null
+                if (name.length >= 2 && unitCost > 0L) ReceiptDraftLine(name, qty, unitCost) else null
             }
         if (items.isEmpty()) return null
 
@@ -141,7 +143,7 @@ object ReceiptParser {
             if (NON_ITEM.containsMatchIn(raw)) continue
             val amount = AMOUNT.find(raw) ?: continue
             val unitCost = parseMoney(amount.groupValues[1])
-            if (unitCost <= 0) {
+            if (unitCost <= 0L) {
                 skipped++
                 continue
             }
@@ -155,7 +157,7 @@ object ReceiptParser {
                 skipped++
                 continue
             }
-            items += ReceiptDraftLine(name = name, quantity = qty, unitCostRupees = unitCost)
+            items += ReceiptDraftLine(name = name, quantity = qty, unitCostCents = unitCost)
         }
 
         val warnings =
@@ -203,7 +205,7 @@ object ReceiptParser {
         return digits > t.length / 2
     }
 
-    private fun parseMoney(cell: String): Int =
-        cell.replace(",", "").filter { it.isDigit() || it == '.' }
-            .toDoubleOrNull()?.toInt() ?: 0
+    /** OCR amount text (e.g. "Rs 1,200.50") → cents, keeping the decimals. */
+    private fun parseMoney(cell: String): Long =
+        Money.parseToCents(cell.filter { it.isDigit() || it == '.' }) ?: 0L
 }

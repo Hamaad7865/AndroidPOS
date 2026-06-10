@@ -57,9 +57,9 @@ import com.nexapos.retail.ui.components.SecBtn
 import com.nexapos.retail.ui.components.SumRow
 import com.nexapos.retail.ui.components.WideBtn
 import com.nexapos.retail.ui.components.rsStr
-import com.nexapos.retail.ui.sale.percentToFlat
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 
@@ -115,10 +115,13 @@ fun AddPurchaseScreen(
         }
     }
 
-    val subtotal = items.sumOf { it.quantity * it.unitCostRupees }
+    val subtotal = items.sumOf { it.quantity * it.unitCostCents }
     var discountIsPercent by remember { mutableStateOf(false) }
     var discountValue by remember { mutableStateOf(0) }
-    val discountFlat = (if (discountIsPercent) percentToFlat(subtotal, discountValue) else discountValue).coerceIn(0, subtotal)
+    // discountValue is a percent, or a whole-rupee flat amount — resolve to cents.
+    val discountFlat =
+        (if (discountIsPercent) subtotal * discountValue / 100 else discountValue * CENTS_PER_RUPEE)
+            .coerceIn(0L, subtotal)
     val total = subtotal - discountFlat
     val canConfirm = supplierName.isNotBlank() && items.isNotEmpty()
 
@@ -137,7 +140,7 @@ fun AddPurchaseScreen(
             status = statusLabel.lowercase(),
             expectedDelivery = expectedDelivery,
             notes = notes,
-            discountRupees = discountFlat,
+            discountCents = discountFlat,
         )
         if (newProductCount > 0) {
             android.widget.Toast.makeText(
@@ -255,8 +258,8 @@ fun AddPurchaseScreen(
                                 Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Text(item.name, Modifier.weight(2f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
                                     Text("${item.quantity}", Modifier.width(60.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink, textAlign = TextAlign.End)
-                                    Text(rsStr(item.unitCostRupees), Modifier.width(90.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink, textAlign = TextAlign.End)
-                                    Text(rsStr(item.quantity * item.unitCostRupees), Modifier.width(100.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.End)
+                                    Text(rsStr(item.unitCostCents), Modifier.width(90.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, color = c.ink, textAlign = TextAlign.End)
+                                    Text(rsStr(item.quantity * item.unitCostCents), Modifier.width(100.dp), fontFamily = JetBrainsMono, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.ink, textAlign = TextAlign.End)
                                     Box(
                                         Modifier.size(24.dp).clip(CircleShape).clickable { items.removeAt(i) },
                                         contentAlignment = Alignment.Center,
@@ -367,7 +370,7 @@ fun AddPurchaseScreen(
                     )
                     if (discountIsPercent) Text("%", fontSize = 13.sp, color = c.muted)
                 }
-                if (discountFlat > 0) {
+                if (discountFlat > 0L) {
                     Spacer(Modifier.height(6.dp))
                     SumRow("Discount", "− ${rsStr(discountFlat)}", mono = true)
                 }
@@ -421,13 +424,14 @@ private fun AddItemDialog(
             .debounce(300L)
             .collectLatest { name ->
                 val suggested = vm.suggestedCost(name)
-                if (suggested > 0 && unitCost.isBlank()) unitCost = suggested.toString()
+                if (suggested > 0L && unitCost.isBlank()) unitCost = Money.toInput(suggested)
             }
     }
 
     val qtyN = qty.filter { it.isDigit() }.toIntOrNull() ?: 0
-    val costN = unitCost.filter { it.isDigit() }.toIntOrNull() ?: 0
-    val canSave = product.isNotBlank() && qtyN > 0 && costN > 0
+    // Parse decimals to exact cents (e.g. "7.5" → 750) instead of stripping the dot.
+    val costN = Money.parseToCents(unitCost) ?: 0L
+    val canSave = product.isNotBlank() && qtyN > 0 && costN > 0L
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -470,7 +474,7 @@ private fun AddItemDialog(
                         placeholder = "0",
                     )
                 }
-                if (qtyN > 0 && costN > 0) {
+                if (qtyN > 0 && costN > 0L) {
                     Text(
                         "Line total: ${rsStr(qtyN * costN)}",
                         fontSize = 12.sp,
@@ -525,7 +529,7 @@ fun PurchaseDetailScreen(
                     purchaseId == null -> "No purchase selected"
                     vm.loading -> "Loading…"
                     vm.notFound -> "Not found"
-                    purchase != null -> "${purchase.itemCount} items · ${rsStr((purchase.totalCents / CENTS_PER_RUPEE).toInt())}"
+                    purchase != null -> "${purchase.itemCount} items · ${rsStr(purchase.totalCents)}"
                     else -> ""
                 },
             right = {
@@ -816,7 +820,7 @@ private fun DetailItemsCard(items: List<com.nexapos.retail.data.entity.PurchaseI
                         textAlign = TextAlign.End,
                     )
                     Text(
-                        rsStr((item.unitCostCents / CENTS_PER_RUPEE).toInt()),
+                        rsStr(item.unitCostCents),
                         Modifier.width(90.dp),
                         fontFamily = JetBrainsMono,
                         fontSize = 13.sp,
@@ -824,7 +828,7 @@ private fun DetailItemsCard(items: List<com.nexapos.retail.data.entity.PurchaseI
                         textAlign = TextAlign.End,
                     )
                     Text(
-                        rsStr((item.lineTotalCents / CENTS_PER_RUPEE).toInt()),
+                        rsStr(item.lineTotalCents),
                         Modifier.width(110.dp),
                         fontFamily = JetBrainsMono,
                         fontSize = 14.sp,
@@ -845,7 +849,7 @@ private fun DetailTotalsCard(
     items: List<com.nexapos.retail.data.entity.PurchaseItem>,
 ) {
     val c = PosTheme.colors
-    val subtotal = (items.sumOf { it.lineTotalCents } / CENTS_PER_RUPEE).toInt()
+    val subtotal = items.sumOf { it.lineTotalCents }
     Column(
         Modifier
             .fillMaxWidth()
@@ -861,7 +865,7 @@ private fun DetailTotalsCard(
         SumRow("Subtotal", rsStr(subtotal), mono = true)
         if (purchase.discountCents > 0) {
             Spacer(Modifier.height(6.dp))
-            SumRow("Discount", "− ${rsStr((purchase.discountCents / CENTS_PER_RUPEE).toInt())}", mono = true)
+            SumRow("Discount", "− ${rsStr(purchase.discountCents)}", mono = true)
         }
         Spacer(Modifier.height(10.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
@@ -873,7 +877,7 @@ private fun DetailTotalsCard(
         ) {
             Text("TOTAL", fontSize = 13.sp, letterSpacing = 0.06.em, fontWeight = FontWeight.SemiBold, color = c.muted)
             Text(
-                rsStr((purchase.totalCents / CENTS_PER_RUPEE).toInt()),
+                rsStr(purchase.totalCents),
                 fontFamily = JetBrainsMono,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,

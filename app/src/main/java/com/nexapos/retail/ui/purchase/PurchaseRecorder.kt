@@ -9,7 +9,6 @@ import com.nexapos.retail.domain.repository.PartiesRepository
 import com.nexapos.retail.domain.repository.PurchasesRepository
 import kotlinx.coroutines.flow.first
 
-private const val CENTS_PER_RUPEE = 100L
 private const val NEXT_CODE_BASE = 1043
 
 /**
@@ -28,7 +27,7 @@ suspend fun recordPurchaseFromDraft(
     status: String = "received",
     expectedDelivery: String = "",
     notes: String = "",
-    discountRupees: Int = 0,
+    discountCents: Long = 0,
 ): Long {
     val trimmedName = supplierName.trim()
     if (trimmedName.isBlank() || items.isEmpty()) return -1L
@@ -54,7 +53,7 @@ suspend fun recordPurchaseFromDraft(
     items.forEach { draft ->
         val key = draft.name.trim().lowercase()
         if (key.isNotEmpty() && nameToId[key] == null) {
-            val unitCostCents = draft.unitCostRupees * CENTS_PER_RUPEE
+            val unitCostCents = draft.unitCostCents
             val newId =
                 catalogRepository.upsert(
                     Product(
@@ -75,9 +74,9 @@ suspend fun recordPurchaseFromDraft(
                 purchaseId = 0,
                 productId = nameToId[draft.name.trim().lowercase()],
                 nameSnapshot = draft.name.trim(),
-                unitCostCents = draft.unitCostRupees * CENTS_PER_RUPEE,
+                unitCostCents = draft.unitCostCents,
                 quantity = draft.quantity,
-                lineTotalCents = draft.quantity * draft.unitCostRupees * CENTS_PER_RUPEE,
+                lineTotalCents = draft.quantity * draft.unitCostCents,
             )
         }
     val orderCount = purchasesRepository.observeRecent().first().size
@@ -90,9 +89,9 @@ suspend fun recordPurchaseFromDraft(
             totalCents =
                 run {
                     val s = lines.sumOf { it.lineTotalCents }
-                    s - (discountRupees * CENTS_PER_RUPEE).coerceIn(0, s)
+                    s - discountCents.coerceIn(0L, s)
                 },
-            discountCents = (discountRupees * CENTS_PER_RUPEE).coerceIn(0, lines.sumOf { it.lineTotalCents }),
+            discountCents = discountCents.coerceIn(0L, lines.sumOf { it.lineTotalCents }),
             paymentMethod = paymentMethod,
             status = status,
             expectedDelivery = expectedDelivery.trim(),

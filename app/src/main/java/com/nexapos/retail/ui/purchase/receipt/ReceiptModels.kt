@@ -12,11 +12,11 @@ data class OcrLine(
     val right: Int,
 )
 
-/** One editable draft line on the review screen (whole-rupee unit cost). */
+/** One editable draft line on the review screen (unit cost in cents). */
 data class ReceiptDraftLine(
     val name: String,
     val quantity: Int,
-    val unitCostRupees: Int,
+    val unitCostCents: Long,
 )
 
 /** Best-effort result of parsing a receipt's OCR lines. */

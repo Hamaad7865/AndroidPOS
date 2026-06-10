@@ -14,11 +14,11 @@ import com.nexapos.retail.domain.repository.PurchasesRepository
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-/** One line a cashier is about to purchase (whole-rupee unit cost). */
+/** One line a cashier is about to purchase (unit cost in cents). */
 data class PurchaseDraftItem(
     val name: String,
     val quantity: Int,
-    val unitCostRupees: Int,
+    val unitCostCents: Long,
 )
 
 class PurchasesViewModel(
@@ -61,10 +61,10 @@ class PurchasesViewModel(
     fun findSupplier(name: String): Party? =
         suppliers.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }
 
-    /** Suggests a unit cost for a product name (the catalog cost) — falls back to 0. */
-    fun suggestedCost(productName: String): Int {
+    /** Suggests a unit cost (cents) for a product name (the catalog cost) — 0 on miss. */
+    fun suggestedCost(productName: String): Long {
         val match = products.firstOrNull { it.name.equals(productName.trim(), ignoreCase = true) }
-        return ((match?.costCents ?: 0L) / CENTS_PER_RUPEE).toInt()
+        return match?.costCents ?: 0L
     }
 
     /** Adds a new supplier on the fly and selects it. Returns the saved party. */
@@ -106,7 +106,7 @@ class PurchasesViewModel(
         status: String = "received",
         expectedDelivery: String = "",
         notes: String = "",
-        discountRupees: Int = 0,
+        discountCents: Long = 0,
     ) {
         if (supplierName.isBlank() || items.isEmpty()) return
         viewModelScope.launch {
@@ -120,7 +120,7 @@ class PurchasesViewModel(
                 status,
                 expectedDelivery,
                 notes,
-                discountRupees,
+                discountCents,
             )
         }
     }

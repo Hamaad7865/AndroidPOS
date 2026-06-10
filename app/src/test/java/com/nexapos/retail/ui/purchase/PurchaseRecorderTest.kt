@@ -148,8 +148,8 @@ class PurchaseRecorderTest {
                 paymentMethod = "cash",
                 items =
                     listOf(
-                        PurchaseDraftItem("Hammer", quantity = 2, unitCostRupees = 250),
-                        PurchaseDraftItem("Brand New Bolt", quantity = 10, unitCostRupees = 5),
+                        PurchaseDraftItem("Hammer", quantity = 2, unitCostCents = 250 * 100L),
+                        PurchaseDraftItem("Brand New Bolt", quantity = 10, unitCostCents = 5 * 100L),
                     ),
             )
             val recorded = fakes.purchases.recorded.single()
@@ -170,7 +170,7 @@ class PurchaseRecorderTest {
                 partiesRepository = fakes.parties,
                 supplierName = "   ",
                 paymentMethod = "cash",
-                items = listOf(PurchaseDraftItem("Nails", quantity = 1, unitCostRupees = 10)),
+                items = listOf(PurchaseDraftItem("Nails", quantity = 1, unitCostCents = 10 * 100L)),
             )
             assertEquals(0, fakes.purchases.recorded.size)
         }
@@ -201,7 +201,7 @@ class PurchaseRecorderTest {
                 partiesRepository = fakes.parties,
                 supplierName = "Duplo Supplies",
                 paymentMethod = "cash",
-                items = listOf(PurchaseDraftItem("Widget", quantity = 1, unitCostRupees = 50)),
+                items = listOf(PurchaseDraftItem("Widget", quantity = 1, unitCostCents = 50 * 100L)),
             )
             // Second call — supplier already exists, should not duplicate
             recordPurchaseFromDraft(
@@ -210,7 +210,7 @@ class PurchaseRecorderTest {
                 partiesRepository = fakes.parties,
                 supplierName = "Duplo Supplies",
                 paymentMethod = "cash",
-                items = listOf(PurchaseDraftItem("Gadget", quantity = 2, unitCostRupees = 30)),
+                items = listOf(PurchaseDraftItem("Gadget", quantity = 2, unitCostCents = 30 * 100L)),
             )
             // Two purchases recorded but supplier only upserted once (checked via Flow first() value)
             assertEquals(2, fakes.purchases.recorded.size)
@@ -226,8 +226,8 @@ class PurchaseRecorderTest {
                 partiesRepository = fakes.parties,
                 supplierName = "ACME",
                 paymentMethod = "cash",
-                items = listOf(PurchaseDraftItem("Pipe", quantity = 10, unitCostRupees = 100)),
-                discountRupees = 150,
+                items = listOf(PurchaseDraftItem("Pipe", quantity = 10, unitCostCents = 100 * 100L)),
+                discountCents = 150 * 100L,
             )
             val recorded = fakes.purchases.recorded.single().first
             assertEquals(150 * 100L, recorded.discountCents)
@@ -244,8 +244,8 @@ class PurchaseRecorderTest {
                 partiesRepository = fakes.parties,
                 supplierName = "ACME",
                 paymentMethod = "cash",
-                items = listOf(PurchaseDraftItem("Pipe", quantity = 1, unitCostRupees = 100)),
-                discountRupees = 500,
+                items = listOf(PurchaseDraftItem("Pipe", quantity = 1, unitCostCents = 100 * 100L)),
+                discountCents = 500 * 100L,
             )
             val recorded = fakes.purchases.recorded.single().first
             assertEquals(100 * 100L, recorded.discountCents)

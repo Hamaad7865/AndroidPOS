@@ -52,6 +52,7 @@ import com.nexapos.retail.ui.components.WideBtn
 import com.nexapos.retail.ui.components.rsStr
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import com.nexapos.retail.util.Money
 
 @Composable
 fun ReceiptScanScreen(
@@ -229,7 +230,7 @@ private fun ReviewBody(
             SecBtn(PosIcons.plus, "Add line") { vm.addBlankLine() }
         }
         FormSection("Total") {
-            SumRow("Total", rsStr(vm.total), mono = true)
+            SumRow("Total", rsStr(vm.totalCents), mono = true)
             Spacer(Modifier.height(8.dp))
             Text(
                 "Registers as a cash purchase order. New item names are added to your catalog; existing ones have their stock raised.",
@@ -305,8 +306,8 @@ private fun ReceiptLineRow(
             )
             EditableField(
                 "Unit cost",
-                if (line.unitCostRupees > 0) line.unitCostRupees.toString() else "",
-                { onChange(line.copy(unitCostRupees = it.toIntOrNull() ?: 0)) },
+                Money.toInput(line.unitCostCents),
+                { onChange(line.copy(unitCostCents = Money.parseToCents(it) ?: 0L)) },
                 Modifier.width(120.dp),
                 mono = true,
                 number = true,

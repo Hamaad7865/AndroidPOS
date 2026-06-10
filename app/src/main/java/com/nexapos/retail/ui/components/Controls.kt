@@ -151,3 +151,6 @@ fun StatusBadge(
 }
 
 fun rsStr(n: Int) = "Rs " + formatNum(n.toDouble(), 0)
+
+/** Money display from exact cents, with 2 decimals (750 -> "Rs 7.50"). */
+fun rsStr(cents: Long) = com.nexapos.retail.util.Money.format(cents)

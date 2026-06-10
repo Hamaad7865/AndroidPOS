@@ -26,4 +26,16 @@ object Money {
         val value = cleaned.toDoubleOrNull() ?: return null
         return Math.round(value * 100)
     }
+
+    /**
+     * Plain editable string (no symbol) for prefilling a money input field:
+     * 750 -> "7.5", 700 -> "7", 705 -> "7.05", 0 -> "". The inverse of
+     * [parseToCents] for round-tripping an existing amount into a text field.
+     */
+    fun toInput(cents: Long): String {
+        if (cents <= 0L) return ""
+        val whole = cents / 100
+        val frac = (cents % 100).toInt()
+        return if (frac == 0) whole.toString() else "%d.%02d".format(whole, frac).trimEnd('0')
+    }
 }

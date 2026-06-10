@@ -20,8 +20,8 @@ class ReceiptParserTest {
         val parsed = ReceiptParser.parse(ocr)
         assertEquals(
             listOf(
-                ReceiptDraftLine("Hammer Claw 16oz", 2, 250),
-                ReceiptDraftLine("Cement Bag 50kg", 1, 520),
+                ReceiptDraftLine("Hammer Claw 16oz", 2, 250 * 100L),
+                ReceiptDraftLine("Cement Bag 50kg", 1, 520 * 100L),
             ),
             parsed.lines,
         )
@@ -91,12 +91,12 @@ class ReceiptParserTest {
         assertEquals("Hardwares Point Ltd", parsed.supplierGuess)
         assertEquals(
             listOf(
-                ReceiptDraftLine("UPVC GUTTER 8OMM WHITE UV", 5, 325),
-                ReceiptDraftLine("UPVC NP PIPE 50MM X 6 MTS", 10, 210),
-                ReceiptDraftLine("UPVC NP PIPE 75MM X 6MTS", 7, 360),
-                ReceiptDraftLine("UPVC NP PIPE 11MM X 6MTS", 5, 550),
-                ReceiptDraftLine("P PIPE 63MM X 6MTS PN16", 3, 1050),
-                ReceiptDraftLine("P. PIPE 50MM X 6MTS PN16", 5, 625),
+                ReceiptDraftLine("UPVC GUTTER 8OMM WHITE UV", 5, 325 * 100L),
+                ReceiptDraftLine("UPVC NP PIPE 50MM X 6 MTS", 10, 210 * 100L),
+                ReceiptDraftLine("UPVC NP PIPE 75MM X 6MTS", 7, 360 * 100L),
+                ReceiptDraftLine("UPVC NP PIPE 11MM X 6MTS", 5, 550 * 100L),
+                ReceiptDraftLine("P PIPE 63MM X 6MTS PN16", 3, 1050 * 100L),
+                ReceiptDraftLine("P. PIPE 50MM X 6MTS PN16", 5, 625 * 100L),
             ),
             parsed.lines,
         )
@@ -106,13 +106,13 @@ class ReceiptParserTest {
     fun `extracts qty name and unit cost from a printed line`() {
         val parsed = ReceiptParser.parse(lines("2 Hammer Claw 16oz   250.00"))
         assertEquals(1, parsed.lines.size)
-        assertEquals(ReceiptDraftLine("Hammer Claw 16oz", 2, 250), parsed.lines.first())
+        assertEquals(ReceiptDraftLine("Hammer Claw 16oz", 2, 250 * 100L), parsed.lines.first())
     }
 
     @Test
     fun `defaults quantity to 1 when absent`() {
         val parsed = ReceiptParser.parse(lines("Cement Bag 50kg   Rs 520"))
-        assertEquals(ReceiptDraftLine("Cement Bag 50kg", 1, 520), parsed.lines.first())
+        assertEquals(ReceiptDraftLine("Cement Bag 50kg", 1, 520 * 100L), parsed.lines.first())
     }
 
     @Test
@@ -139,7 +139,8 @@ class ReceiptParserTest {
     @Test
     fun `handles messy money formats`() {
         val parsed = ReceiptParser.parse(lines("Paint White 5L  Rs 1,200.50"))
-        assertEquals(1200, parsed.lines.first().unitCostRupees)
+        // Decimals are kept now: Rs 1,200.50 → 120050 cents (was truncated to 1200).
+        assertEquals(120050L, parsed.lines.first().unitCostCents)
     }
 
     @Test

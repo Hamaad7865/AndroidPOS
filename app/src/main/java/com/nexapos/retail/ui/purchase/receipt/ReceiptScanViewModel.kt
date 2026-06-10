@@ -47,7 +47,7 @@ class ReceiptScanViewModel(
     /** Whether a line's name already exists in the catalog (else it'll be created). */
     fun isKnown(line: ReceiptDraftLine): Boolean = line.name.trim().lowercase() in catalogNames
 
-    val total: Int get() = lines.sumOf { it.quantity * it.unitCostRupees }
+    val totalCents: Long get() = lines.sumOf { it.quantity * it.unitCostCents }
 
     /** Runs OCR + parse on a captured image, then moves to REVIEW. */
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // best-effort OCR; any failure falls back to manual entry
@@ -100,7 +100,7 @@ class ReceiptScanViewModel(
 
     fun register(onDone: () -> Unit) {
         if (registering) return // ignore double-taps while the first save is in flight
-        val valid = lines.filter { it.name.isNotBlank() && it.quantity > 0 && it.unitCostRupees > 0 }
+        val valid = lines.filter { it.name.isNotBlank() && it.quantity > 0 && it.unitCostCents > 0 }
         if (supplier.isBlank() || valid.isEmpty()) return
         registering = true
         viewModelScope.launch {
@@ -111,7 +111,7 @@ class ReceiptScanViewModel(
                     partiesRepository,
                     supplierName = supplier,
                     paymentMethod = "cash",
-                    items = valid.map { PurchaseDraftItem(it.name, it.quantity, it.unitCostRupees) },
+                    items = valid.map { PurchaseDraftItem(it.name, it.quantity, it.unitCostCents) },
                     notes = "From scanned receipt",
                 )
                 phase = ScanPhase.DONE
