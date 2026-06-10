@@ -17,6 +17,7 @@ import com.nexapos.retail.ui.sale.SaleReturnViewModel
 import com.nexapos.retail.ui.sale.SalesListViewModel
 import com.nexapos.retail.ui.sale.SellingViewModel
 import com.nexapos.retail.ui.settings.StaffViewModel
+import com.nexapos.retail.ui.shift.ShiftViewModel
 
 /** Wires ViewModels to the app's [com.nexapos.retail.di.AppContainer]. */
 object AppViewModelProvider {
@@ -28,6 +29,9 @@ object AppViewModelProvider {
                     catalogRepository = c.catalogRepository,
                     salesRepository = c.salesRepository,
                     partiesRepository = c.partiesRepository,
+                    drawerKicker = c.drawerKicker,
+                    shiftRepository = c.shiftRepository,
+                    session = c.session,
                 )
             }
             initializer {
@@ -42,7 +46,12 @@ object AppViewModelProvider {
             }
             initializer {
                 val c = posApplication().container
-                MoneyViewModel(moneyRepository = c.moneyRepository, salesRepository = c.salesRepository)
+                MoneyViewModel(
+                    moneyRepository = c.moneyRepository,
+                    salesRepository = c.salesRepository,
+                    shiftRepository = c.shiftRepository,
+                    session = c.session,
+                )
             }
             initializer {
                 val c = posApplication().container
@@ -79,6 +88,9 @@ object AppViewModelProvider {
                 SaleReturnViewModel(
                     salesRepository = c.salesRepository,
                     returnsRepository = c.returnsRepository,
+                    drawerKicker = c.drawerKicker,
+                    shiftRepository = c.shiftRepository,
+                    session = c.session,
                 )
             }
             initializer {
@@ -87,6 +99,13 @@ object AppViewModelProvider {
             initializer {
                 val c = posApplication().container
                 StaffViewModel(staffRepository = c.staffRepository, session = c.session)
+            }
+            initializer {
+                val c = posApplication().container
+                ShiftViewModel(
+                    shiftRepository = c.shiftRepository,
+                    session = c.session,
+                )
             }
             initializer {
                 val c = posApplication().container

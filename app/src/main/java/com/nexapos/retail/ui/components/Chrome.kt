@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,12 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.PosApplication
 import com.nexapos.retail.data.entity.isAdmin
 import com.nexapos.retail.ui.session.currentStaff
 import com.nexapos.retail.ui.theme.HankenGrotesk
@@ -290,6 +293,10 @@ fun SessionSlot(
     var showDialog by remember { mutableStateOf(false) }
 
     if (showDialog) {
+        // Warn (but don't block) when a till shift is still open — it survives
+        // sign-out and can be closed by the next staff member or an admin.
+        val container = (LocalContext.current.applicationContext as PosApplication).container
+        val openShift by container.shiftRepository.observeOpenShift().collectAsState(initial = null)
         AlertDialog(
             onDismissRequest = { showDialog = false },
             confirmButton = {
@@ -314,6 +321,15 @@ fun SessionSlot(
                             fontSize = 12.sp,
                             color = c.muted,
                         )
+                        openShift?.let { s ->
+                            Text(
+                                "⚠ ${s.staffName}'s shift is still open — it stays open after sign-out. " +
+                                    "Close it from the Shift screen to balance the drawer.",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = c.amberPress,
+                            )
+                        }
                     } else {
                         Text("Lock the till and sign in with a staff PIN.", fontSize = 13.sp)
                     }

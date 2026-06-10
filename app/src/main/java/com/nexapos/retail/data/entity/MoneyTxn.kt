@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 /** A manual cash-book entry. [type] is INCOME or EXPENSE. */
 @Entity(
     tableName = "money_txns",
-    indices = [Index("type"), Index("createdAt")],
+    indices = [Index("type"), Index("createdAt"), Index("shiftId")],
 )
 data class MoneyTxn(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -20,6 +20,8 @@ data class MoneyTxn(
     val account: String = "",
     val createdBy: String = "",
     val createdAt: Long,
+    /** Till shift this entry was recorded in; null when no shift was open. */
+    val shiftId: Long? = null,
 ) {
     companion object {
         const val TYPE_INCOME = "INCOME"

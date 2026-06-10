@@ -4,26 +4,31 @@ import android.content.Context
 import androidx.room.Room
 import com.nexapos.retail.data.MIGRATION_10_11
 import com.nexapos.retail.data.MIGRATION_11_12
+import com.nexapos.retail.data.MIGRATION_12_13
 import com.nexapos.retail.data.MIGRATION_6_7
 import com.nexapos.retail.data.MIGRATION_7_8
 import com.nexapos.retail.data.MIGRATION_8_9
 import com.nexapos.retail.data.MIGRATION_9_10
 import com.nexapos.retail.data.PosDatabase
+import com.nexapos.retail.data.hardware.drawer.EscPosDrawerKicker
 import com.nexapos.retail.data.repository.RoomCatalogRepository
 import com.nexapos.retail.data.repository.RoomMoneyRepository
 import com.nexapos.retail.data.repository.RoomPartiesRepository
 import com.nexapos.retail.data.repository.RoomPurchasesRepository
 import com.nexapos.retail.data.repository.RoomReturnsRepository
 import com.nexapos.retail.data.repository.RoomSalesRepository
+import com.nexapos.retail.data.repository.RoomShiftRepository
 import com.nexapos.retail.data.repository.RoomStaffRepository
 import com.nexapos.retail.data.security.DbKeyManager
 import com.nexapos.retail.data.security.StaffSession
+import com.nexapos.retail.domain.hardware.DrawerKicker
 import com.nexapos.retail.domain.repository.CatalogRepository
 import com.nexapos.retail.domain.repository.MoneyRepository
 import com.nexapos.retail.domain.repository.PartiesRepository
 import com.nexapos.retail.domain.repository.PurchasesRepository
 import com.nexapos.retail.domain.repository.ReturnsRepository
 import com.nexapos.retail.domain.repository.SalesRepository
+import com.nexapos.retail.domain.repository.ShiftRepository
 import com.nexapos.retail.domain.repository.StaffRepository
 import net.sqlcipher.database.SupportFactory
 
@@ -33,9 +38,11 @@ import net.sqlcipher.database.SupportFactory
  * decoupled from Room. Created once in [com.nexapos.retail.PosApplication].
  */
 class AppContainer(context: Context) {
+    private val appContext: Context = context.applicationContext
+
     private val database: PosDatabase =
         Room.databaseBuilder(
-            context.applicationContext,
+            appContext,
             PosDatabase::class.java,
             "nexapos.db",
         )
@@ -49,7 +56,7 @@ class AppContainer(context: Context) {
             // No legacy data is in production yet, so v1 → v2 schema bumps (added Brand,
             // plus the extra Product columns) just recreate the DB. The user's flow already
             // includes a "Delete all data" path for the same purpose.
-            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
@@ -79,6 +86,15 @@ class AppContainer(context: Context) {
 
     val staffRepository: StaffRepository by lazy {
         RoomStaffRepository(database.staffDao())
+    }
+
+    /** Pulses the receipt printer to pop the cash drawer; no-op until configured. */
+    val drawerKicker: DrawerKicker by lazy {
+        EscPosDrawerKicker(appContext)
+    }
+
+    val shiftRepository: ShiftRepository by lazy {
+        RoomShiftRepository(database.shiftDao())
     }
 
     /** Who is signed in at this till. In-memory; cleared on every cold start. */

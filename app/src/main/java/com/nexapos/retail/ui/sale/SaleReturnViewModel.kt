@@ -8,8 +8,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexapos.retail.data.entity.SaleReturn
 import com.nexapos.retail.data.entity.SaleReturnItem
+import com.nexapos.retail.data.entity.Shift
+import com.nexapos.retail.data.security.StaffSession
+import com.nexapos.retail.domain.hardware.DrawerKicker
+import com.nexapos.retail.domain.hardware.KickReason
 import com.nexapos.retail.domain.repository.ReturnsRepository
 import com.nexapos.retail.domain.repository.SalesRepository
+import com.nexapos.retail.domain.repository.ShiftRepository
 import kotlinx.coroutines.launch
 
 /** One returnable line of the original sale. */
@@ -29,7 +34,16 @@ data class ReturnLine(
 class SaleReturnViewModel(
     private val salesRepository: SalesRepository,
     private val returnsRepository: ReturnsRepository,
+    private val drawerKicker: DrawerKicker,
+    private val shiftRepository: ShiftRepository,
+    private val session: StaffSession,
 ) : ViewModel() {
+    private var openShift: Shift? = null
+
+    init {
+        viewModelScope.launch { shiftRepository.observeOpenShift().collect { openShift = it } }
+    }
+
     var loading by mutableStateOf(true)
         private set
 
@@ -153,6 +167,8 @@ class SaleReturnViewModel(
                     createdAt = System.currentTimeMillis(),
                     totalCents = totalCents,
                     refundMethod = refundMethod,
+                    staffId = session.current.value?.id,
+                    shiftId = openShift?.id,
                 )
             val items =
                 picked.map { (line, q) ->
@@ -166,6 +182,8 @@ class SaleReturnViewModel(
                     )
                 }
             returnsRepository.recordReturn(saleReturn, items)
+            // Cash refunds come out of the drawer — pop it. Fire-and-forget.
+            if (refundMethod == "CASH") drawerKicker.kick(KickReason.CASH_REFUND)
             onDone()
         }
     }

@@ -28,4 +28,14 @@ object StaffPolicy {
     ): Boolean =
         target.isAdmin() && target.active &&
             staff.none { it.id != target.id && it.active && it.isAdmin() }
+
+    /**
+     * Shift reports show payment-method revenue (not profit), so a cashier may
+     * see their OWN shifts; admins see every shift.
+     */
+    fun canSeeShift(
+        isAdmin: Boolean,
+        viewerStaffId: Long?,
+        shiftStaffId: Long,
+    ): Boolean = isAdmin || (viewerStaffId != null && viewerStaffId == shiftStaffId)
 }

@@ -161,6 +161,7 @@ fun MoneyHubScreen(
         onNav = onNav,
         rightExtra = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SecBtn(PosIcons.wallet, "Shift / Till") { onNav("shift") }
                 SecBtn(PosIcons.plus, "Expense") { onNav("add-expense") }
                 PrimaryBtn(PosIcons.plus, "Income") { onNav("add-income") }
             }

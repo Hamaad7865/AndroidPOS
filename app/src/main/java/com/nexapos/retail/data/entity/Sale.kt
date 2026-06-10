@@ -16,7 +16,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.SET_NULL,
         ),
     ],
-    indices = [Index("customerId"), Index("createdAt"), Index(value = ["receiptNo"], unique = true)],
+    indices = [Index("customerId"), Index("createdAt"), Index(value = ["receiptNo"], unique = true), Index("shiftId")],
 )
 data class Sale(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -40,4 +40,8 @@ data class Sale(
     /** Free-text remark captured at the till (delivery instructions, customer ref). */
     @ColumnInfo(defaultValue = "")
     val note: String = "",
+    /** Staff member who rang the sale up; null on rows from before v13. */
+    val staffId: Long? = null,
+    /** Till shift this sale belongs to; null when no shift was open. */
+    val shiftId: Long? = null,
 )

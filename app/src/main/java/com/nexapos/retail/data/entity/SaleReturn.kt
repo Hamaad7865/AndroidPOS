@@ -26,7 +26,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.SET_NULL,
         ),
     ],
-    indices = [Index("saleId"), Index("customerId"), Index("createdAt")],
+    indices = [Index("saleId"), Index("customerId"), Index("createdAt"), Index("shiftId")],
 )
 data class SaleReturn(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -42,4 +42,8 @@ data class SaleReturn(
     /** CASH (cash handed back) or CREDIT (reduces the customer's balance). */
     val refundMethod: String,
     val status: String = "COMPLETED",
+    /** Staff member who recorded the return; null on rows from before v13. */
+    val staffId: Long? = null,
+    /** Till shift this return belongs to; null when no shift was open. */
+    val shiftId: Long? = null,
 )

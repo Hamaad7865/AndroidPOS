@@ -9,9 +9,14 @@ import androidx.lifecycle.viewModelScope
 import com.nexapos.retail.data.entity.Party
 import com.nexapos.retail.data.entity.Sale
 import com.nexapos.retail.data.entity.SaleItem
+import com.nexapos.retail.data.entity.Shift
+import com.nexapos.retail.data.security.StaffSession
+import com.nexapos.retail.domain.hardware.DrawerKicker
+import com.nexapos.retail.domain.hardware.KickReason
 import com.nexapos.retail.domain.repository.CatalogRepository
 import com.nexapos.retail.domain.repository.PartiesRepository
 import com.nexapos.retail.domain.repository.SalesRepository
+import com.nexapos.retail.domain.repository.ShiftRepository
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -106,7 +111,14 @@ class SellingViewModel(
     private val catalogRepository: CatalogRepository,
     private val salesRepository: SalesRepository,
     private val partiesRepository: PartiesRepository,
+    private val drawerKicker: DrawerKicker,
+    private val shiftRepository: ShiftRepository,
+    private val session: StaffSession,
 ) : ViewModel() {
+    /** The till shift currently open, if any — new sales are stamped with it. */
+    var openShift by mutableStateOf<Shift?>(null)
+        private set
+
     /** Catalog products mapped for display, refreshed whenever Room changes. */
     var products by mutableStateOf<List<PosProduct>>(emptyList())
         private set
@@ -179,6 +191,7 @@ class SellingViewModel(
             }
         }
         viewModelScope.launch { partiesRepository.observeCustomers().collect { customers = it } }
+        viewModelScope.launch { shiftRepository.observeOpenShift().collect { openShift = it } }
     }
 
     // --- Customer picker -------------------------------------------------
@@ -550,6 +563,9 @@ class SellingViewModel(
                 customerId = customer?.id,
                 customerName = customer?.name ?: snapshot.customerName,
                 note = snapshot.note,
+                // Stamp who sold and in which till shift — exact shift reports.
+                staffId = session.current.value?.id,
+                shiftId = openShift?.id,
             )
         val items =
             snapshot.lines.map { line ->
@@ -581,6 +597,9 @@ class SellingViewModel(
                     creditDeltaCents = creditDeltaCents,
                     invoiceStartSeq = STARTING_INVOICE,
                 )
+                // Pop the cash drawer to take the money / give change. Fire-and-forget:
+                // the sale is already committed and never waits on the printer.
+                if (sale.paymentMethod == "CASH") drawerKicker.kick(KickReason.CASH_SALE)
                 // Bump the local preview counter so "New ticket S-XXXXX ready" shows the next seq.
                 saleCount++
                 nextInvoiceNo = formatInvoice(STARTING_INVOICE + saleCount + 1)

@@ -36,6 +36,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +56,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.PosApplication
+import com.nexapos.retail.data.profile.DrawerSettings
+import com.nexapos.retail.domain.hardware.KickReason
+import com.nexapos.retail.domain.hardware.KickResult
 import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.CountUp
 import com.nexapos.retail.ui.components.NavShell
@@ -67,6 +72,7 @@ import com.nexapos.retail.ui.components.isPortrait
 import com.nexapos.retail.ui.theme.HankenGrotesk
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -172,11 +178,28 @@ fun PosSaleScreen(
             primary = { primaryMod ->
                 // Center / product area
                 Column(primaryMod) {
+                    val shiftSubtitle =
+                        vm.openShift?.let { s ->
+                            "Shift open since ${android.text.format.DateFormat.format("HH:mm", s.openedAt)} · ${s.staffName}"
+                        } ?: "No shift open — totals won't be tallied"
                     AppBar(
                         title = "POS Sale",
-                        subtitle = "Counter 01 · Shift opened 08:32",
+                        subtitle = shiftSubtitle,
                         right = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                val drawerCtx = androidx.compose.ui.platform.LocalContext.current
+                                if (DrawerSettings.isConfigured(drawerCtx)) {
+                                    val drawerScope = rememberCoroutineScope()
+                                    SmallBtn(PosIcons.cash, "Drawer") {
+                                        val kicker = (drawerCtx.applicationContext as PosApplication).container.drawerKicker
+                                        drawerScope.launch {
+                                            val result = kicker.kickNow(KickReason.MANUAL)
+                                            if (result is KickResult.Failed) {
+                                                android.widget.Toast.makeText(drawerCtx, "Drawer: ${result.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                }
                                 HoldMenuButton(vm)
                                 SmallBtn(PosIcons.receipt, "Sales") { onNav("sales-list") }
                             }

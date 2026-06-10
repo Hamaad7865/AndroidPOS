@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,6 +91,7 @@ fun DashboardScreen(
                 .padding(horizontal = 22.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
+            ShiftStatusBanner(onNav)
             // KPI band — real numbers only; trends/sparks appear once history exists.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 StatCard("Today's Sales", vm.todaySales, null, c.amber, PosIcons.cart, emptyList(), Modifier.weight(1f))
@@ -368,6 +371,53 @@ private fun StatCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Till-shift status strip: green-ish when a shift is open, amber nudge when
+ * not. Tapping it opens the Shift screen. Reads the open shift straight from
+ * the container so the dashboard VM stays untouched.
+ */
+@Composable
+private fun ShiftStatusBanner(onNav: (String) -> Unit) {
+    val c = PosTheme.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val container = (context.applicationContext as com.nexapos.retail.PosApplication).container
+    val shift by container.shiftRepository.observeOpenShift().collectAsState(initial = null)
+    val open = shift != null
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (open) c.raised else c.amberTint)
+            .border(1.dp, if (open) c.hairline else c.amberSoft, RoundedCornerShape(12.dp))
+            .clickable { onNav("shift") }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        PosIcon(PosIcons.wallet, tint = if (open) c.emerald else c.amberPress, size = 16.dp)
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (open) {
+                    "Shift open since " +
+                        java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(shift!!.openedAt)) +
+                        " · ${shift!!.staffName}"
+                } else {
+                    "No shift open"
+                },
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = c.ink,
+            )
+            Text(
+                if (open) "Tap for live totals or to close the till" else "Open the till with a float so the day's cash is accountable",
+                fontSize = 11.sp,
+                color = c.muted,
+            )
+        }
+        Text("›", fontSize = 18.sp, color = c.muted)
     }
 }
 

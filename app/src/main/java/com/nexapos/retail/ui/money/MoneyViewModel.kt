@@ -7,8 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nexapos.retail.data.entity.MoneyTxn
 import com.nexapos.retail.data.entity.Sale
+import com.nexapos.retail.data.entity.Shift
+import com.nexapos.retail.data.security.StaffSession
 import com.nexapos.retail.domain.repository.MoneyRepository
 import com.nexapos.retail.domain.repository.SalesRepository
+import com.nexapos.retail.domain.repository.ShiftRepository
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -46,7 +49,12 @@ data class AccountSummary(
 class MoneyViewModel(
     private val moneyRepository: MoneyRepository,
     salesRepository: SalesRepository,
+    private val shiftRepository: ShiftRepository,
+    private val session: StaffSession,
 ) : ViewModel() {
+    /** Open till shift, if any — manual entries are stamped with it. */
+    private var openShift: Shift? = null
+
     var incomes by mutableStateOf<List<MoneyTxn>>(emptyList())
         private set
 
@@ -79,6 +87,7 @@ class MoneyViewModel(
             moneyRepository.observeSumSince(MoneyTxn.TYPE_EXPENSE, monthStart).collect { expenseMonthCents = it }
         }
         viewModelScope.launch { salesRepository.observeTotalSince(monthStart).collect { salesMonthCents = it } }
+        viewModelScope.launch { shiftRepository.observeOpenShift().collect { openShift = it } }
     }
 
     /** Income this month = sales takings + manual income entries, in whole rupees. */
@@ -173,7 +182,10 @@ class MoneyViewModel(
                     description = description.trim(),
                     amountCents = amountRupees * CENTS_PER_RUPEE,
                     account = account,
+                    createdBy = session.current.value?.name.orEmpty(),
                     createdAt = System.currentTimeMillis(),
+                    // Stamped entries count toward the open shift's expected cash.
+                    shiftId = openShift?.id,
                 ),
             )
         }

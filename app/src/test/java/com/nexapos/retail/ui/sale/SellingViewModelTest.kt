@@ -3,9 +3,16 @@ package com.nexapos.retail.ui.sale
 import com.nexapos.retail.MainDispatcherRule
 import com.nexapos.retail.data.entity.Category
 import com.nexapos.retail.data.entity.Product
+import com.nexapos.retail.data.entity.Shift
+import com.nexapos.retail.data.entity.Staff
+import com.nexapos.retail.data.entity.StaffRole
+import com.nexapos.retail.data.security.StaffSession
+import com.nexapos.retail.domain.hardware.KickReason
 import com.nexapos.retail.fake.FakeCatalogRepository
+import com.nexapos.retail.fake.FakeDrawerKicker
 import com.nexapos.retail.fake.FakePartiesRepository
 import com.nexapos.retail.fake.FakeSalesRepository
+import com.nexapos.retail.fake.FakeShiftRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -29,9 +36,12 @@ class SellingViewModelTest {
         )
     private val sales = FakeSalesRepository()
     private val parties = FakePartiesRepository()
+    private val drawer = FakeDrawerKicker()
+    private val shifts = FakeShiftRepository()
+    private val session = StaffSession()
 
     // The dispatcher rule is unconfined, so the VM's init coroutines run eagerly on construction.
-    private fun vm() = SellingViewModel(catalog, sales, parties)
+    private fun vm() = SellingViewModel(catalog, sales, parties, drawer, shifts, session)
 
     @Test
     fun `catalog is mapped to whole-rupee display products`() =
@@ -130,7 +140,7 @@ class SellingViewModelTest {
     fun `complete sets saleError when repository throws`() =
         runTest {
             val failingSales = FakeSalesRepository(failOnRecord = true)
-            val model = SellingViewModel(catalog, failingSales, parties)
+            val model = SellingViewModel(catalog, failingSales, parties, drawer, shifts, session)
             val wrench = model.products.first { it.sku == "WRN-T17" }
             model.addToCart(wrench)
             model.beginCheckout()
@@ -139,6 +149,78 @@ class SellingViewModelTest {
             // lastSale is set optimistically before the coroutine runs.
             assertNotNull(model.lastSale)
             assertNotNull(model.saleError)
+        }
+
+    @Test
+    fun `cash sale kicks the drawer exactly once after checkout succeeds`() =
+        runTest {
+            val model = vm()
+            val wrench = model.products.first { it.sku == "WRN-T17" }
+            model.addToCart(wrench)
+            model.beginCheckout() // default payment method is cash
+            model.complete()
+            assertEquals(listOf(KickReason.CASH_SALE), drawer.kicks)
+        }
+
+    @Test
+    fun `card sale never kicks the drawer`() =
+        runTest {
+            val model = vm()
+            val wrench = model.products.first { it.sku == "WRN-T17" }
+            model.addToCart(wrench)
+            model.beginCheckout()
+            model.setPaymentType("card")
+            model.complete()
+            assertEquals(1, sales.recorded.size)
+            assertTrue(drawer.kicks.isEmpty())
+        }
+
+    @Test
+    fun `failed checkout does not kick the drawer`() =
+        runTest {
+            val failingSales = FakeSalesRepository(failOnRecord = true)
+            val localDrawer = FakeDrawerKicker()
+            val model = SellingViewModel(catalog, failingSales, parties, localDrawer, shifts, session)
+            val wrench = model.products.first { it.sku == "WRN-T17" }
+            model.addToCart(wrench)
+            model.beginCheckout()
+            model.complete()
+            assertNotNull(model.saleError)
+            assertTrue(localDrawer.kicks.isEmpty())
+        }
+
+    @Test
+    fun `sale is stamped with the signed-in staff and open shift`() =
+        runTest {
+            val openShifts =
+                FakeShiftRepository(
+                    open = Shift(id = 42, staffId = 9, staffName = "Priya", openedAt = 0L, openingFloatCents = 100_000),
+                )
+            session.login(
+                Staff(id = 9, name = "Priya", pinHash = "h", pinSalt = "s", role = StaffRole.CASHIER.name, createdAt = 0L),
+            )
+            val model = SellingViewModel(catalog, sales, parties, drawer, openShifts, session)
+            val wrench = model.products.first { it.sku == "WRN-T17" }
+            model.addToCart(wrench)
+            model.beginCheckout()
+            model.complete()
+            val (sale, _) = sales.recorded.first()
+            assertEquals(9L, sale.staffId)
+            assertEquals(42L, sale.shiftId)
+        }
+
+    @Test
+    fun `sale with no open shift and no session keeps null stamps`() =
+        runTest {
+            session.logout()
+            val model = vm()
+            val wrench = model.products.first { it.sku == "WRN-T17" }
+            model.addToCart(wrench)
+            model.beginCheckout()
+            model.complete()
+            val (sale, _) = sales.recorded.first()
+            assertNull(sale.staffId)
+            assertNull(sale.shiftId)
         }
 
     @Test

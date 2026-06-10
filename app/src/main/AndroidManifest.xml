@@ -20,6 +20,15 @@
     </queries>
 
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
+    <!-- Cash drawer: the ESC/POS pulse goes straight to the receipt printer over
+         the network (port 9100) or classic Bluetooth SPP. Legacy BT permissions
+         cover API 26-30; BLUETOOTH_CONNECT is the API 31+ runtime permission. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <application
         android:name=".PosApplication"

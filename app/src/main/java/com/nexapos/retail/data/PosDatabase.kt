@@ -12,6 +12,7 @@ import com.nexapos.retail.data.dao.ProductDao
 import com.nexapos.retail.data.dao.PurchaseDao
 import com.nexapos.retail.data.dao.SaleDao
 import com.nexapos.retail.data.dao.SaleReturnDao
+import com.nexapos.retail.data.dao.ShiftDao
 import com.nexapos.retail.data.dao.StaffDao
 import com.nexapos.retail.data.entity.Brand
 import com.nexapos.retail.data.entity.Category
@@ -24,6 +25,7 @@ import com.nexapos.retail.data.entity.Sale
 import com.nexapos.retail.data.entity.SaleItem
 import com.nexapos.retail.data.entity.SaleReturn
 import com.nexapos.retail.data.entity.SaleReturnItem
+import com.nexapos.retail.data.entity.Shift
 import com.nexapos.retail.data.entity.Staff
 
 @Database(
@@ -40,6 +42,7 @@ import com.nexapos.retail.data.entity.Staff
         SaleReturn::class,
         SaleReturnItem::class,
         Staff::class,
+        Shift::class,
     ],
     // v5: added unique index on sales.receiptNo; invoice seq now derived in-txn from MAX(receiptNo).
     // v6: purchases gained expectedDelivery + notes columns.
@@ -49,7 +52,9 @@ import com.nexapos.retail.data.entity.Staff
     // v10: purchases gained a discountCents column (additive, non-destructive MIGRATION_9_10).
     // v11: sales gained a note column (additive, non-destructive MIGRATION_10_11).
     // v12: new staff table for per-staff PINs and roles (additive MIGRATION_11_12).
-    version = 12,
+    // v13: new shifts table + staffId/shiftId stamps on sales, sale_returns and
+    //      money_txns for till-shift reports (additive MIGRATION_12_13).
+    version = 13,
     exportSchema = true,
 )
 abstract class PosDatabase : RoomDatabase() {
@@ -70,6 +75,8 @@ abstract class PosDatabase : RoomDatabase() {
     abstract fun purchaseDao(): PurchaseDao
 
     abstract fun staffDao(): StaffDao
+
+    abstract fun shiftDao(): ShiftDao
 }
 
 /** v6→v7: add products.vatType, defaulting existing rows to STANDARD (unchanged 15% behaviour). */
@@ -130,5 +137,39 @@ val MIGRATION_11_12 =
                     "`active` INTEGER NOT NULL, " +
                     "`createdAt` INTEGER NOT NULL)",
             )
+        }
+    }
+
+/**
+ * v12→v13: shifts table for till sessions, plus staffId/shiftId stamps on
+ * sales, sale_returns and money_txns so shift reports aggregate exactly.
+ * All additive; pre-v13 rows keep NULL stamps.
+ */
+val MIGRATION_12_13 =
+    object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `shifts` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`staffId` INTEGER NOT NULL, " +
+                    "`staffName` TEXT NOT NULL, " +
+                    "`openedAt` INTEGER NOT NULL, " +
+                    "`closedAt` INTEGER, " +
+                    "`openingFloatCents` INTEGER NOT NULL, " +
+                    "`declaredCashCents` INTEGER, " +
+                    "`expectedCashCents` INTEGER, " +
+                    "`status` TEXT NOT NULL, " +
+                    "`note` TEXT NOT NULL DEFAULT '')",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shifts_status` ON `shifts` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shifts_openedAt` ON `shifts` (`openedAt`)")
+            db.execSQL("ALTER TABLE sales ADD COLUMN staffId INTEGER")
+            db.execSQL("ALTER TABLE sales ADD COLUMN shiftId INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_shiftId` ON `sales` (`shiftId`)")
+            db.execSQL("ALTER TABLE sale_returns ADD COLUMN staffId INTEGER")
+            db.execSQL("ALTER TABLE sale_returns ADD COLUMN shiftId INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_sale_returns_shiftId` ON `sale_returns` (`shiftId`)")
+            db.execSQL("ALTER TABLE money_txns ADD COLUMN shiftId INTEGER")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_money_txns_shiftId` ON `money_txns` (`shiftId`)")
         }
     }

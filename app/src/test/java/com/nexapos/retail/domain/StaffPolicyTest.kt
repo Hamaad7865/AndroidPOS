@@ -86,4 +86,25 @@ class StaffPolicyTest {
         val cashier = staff(2, StaffRole.CASHIER)
         assertFalse(StaffPolicy.wouldRemoveLastAdmin(listOf(benched, cashier), benched))
     }
+
+    // ------------------------------------------------------------------
+    // canSeeShift — admins see every shift, cashiers only their own
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `admin sees any shift`() {
+        assertTrue(StaffPolicy.canSeeShift(isAdmin = true, viewerStaffId = 1, shiftStaffId = 99))
+        assertTrue(StaffPolicy.canSeeShift(isAdmin = true, viewerStaffId = null, shiftStaffId = 99))
+    }
+
+    @Test
+    fun `cashier sees only their own shifts`() {
+        assertTrue(StaffPolicy.canSeeShift(isAdmin = false, viewerStaffId = 7, shiftStaffId = 7))
+        assertFalse(StaffPolicy.canSeeShift(isAdmin = false, viewerStaffId = 7, shiftStaffId = 8))
+    }
+
+    @Test
+    fun `no session sees no shifts`() {
+        assertFalse(StaffPolicy.canSeeShift(isAdmin = false, viewerStaffId = null, shiftStaffId = 7))
+    }
 }

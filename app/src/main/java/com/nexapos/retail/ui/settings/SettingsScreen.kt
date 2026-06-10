@@ -84,6 +84,7 @@ private fun groups(admin: Boolean) =
             listOf(
                 SettingItem(PosIcons.print, "Printing & receipt", "Paper size, footer, test print", "printing-settings"),
                 SettingItem(PosIcons.barcode, "Barcode scanner", "External USB / Bluetooth scanner", "scanner-settings"),
+                SettingItem(PosIcons.cash, "Cash drawer", "Pops on cash payments · via the receipt printer", "drawer-settings"),
             ),
         ),
         SettingGroup(

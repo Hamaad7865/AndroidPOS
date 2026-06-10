@@ -1,7 +1,12 @@
 package com.nexapos.retail.ui
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,8 +40,12 @@ import com.nexapos.retail.ui.sale.PosSaleScreen
 import com.nexapos.retail.ui.sale.SaleReturnScreen
 import com.nexapos.retail.ui.sale.SalesListScreen
 import com.nexapos.retail.ui.sale.SellingViewModel
+import com.nexapos.retail.ui.session.currentStaff
 import com.nexapos.retail.ui.settings.PrintingSettingsScreen
 import com.nexapos.retail.ui.settings.SettingsScreen
+import com.nexapos.retail.ui.shift.ShiftHistoryScreen
+import com.nexapos.retail.ui.shift.ShiftScreen
+import com.nexapos.retail.ui.shift.ShiftViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -64,6 +73,8 @@ private val MODULE_ROUTES =
 fun PosApp() {
     val navController = rememberNavController()
     val selling: SellingViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    // App-level like `selling`, so the "open a shift?" prompt state survives navigation.
+    val shiftVm: ShiftViewModel = viewModel(factory = AppViewModelProvider.Factory)
     val appContext = LocalContext.current
 
     // Stable lambda: navigating to a top-level module resets the back stack down
@@ -71,7 +82,7 @@ fun PosApp() {
     // Wrapped in remember so its identity is stable across recompositions and does
     // not cause the entire nav graph to rebuild.
     val go: (String) -> Unit =
-        remember(navController, appContext, selling) {
+        remember(navController, appContext, selling, shiftVm) {
             { id ->
                 when {
                     // "lock" is the sign-out action (nav-rail session badge), not a
@@ -80,6 +91,7 @@ fun PosApp() {
                     // so Back can't walk into another staff member's session.
                     id == "lock" -> {
                         selling.resetForSignOut()
+                        shiftVm.onSignOut()
                         (appContext.applicationContext as PosApplication).container.session.logout()
                         navController.navigate("login") {
                             popUpTo(navController.graph.id) { inclusive = true }
@@ -155,6 +167,32 @@ fun PosApp() {
         }
         composable("home") {
             DashboardScreen(vm = viewModel(factory = AppViewModelProvider.Factory), onNav = go)
+            // Nudge once per sign-in: a till shift makes the day's cash accountable.
+            val openShift by shiftVm.openShift.collectAsState()
+            val signedIn = currentStaff()
+            if (signedIn != null && openShift == null && !shiftVm.promptDismissed) {
+                AlertDialog(
+                    onDismissRequest = { shiftVm.promptDismissed = true },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                shiftVm.promptDismissed = true
+                                go("shift")
+                            },
+                        ) { Text("Open shift") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { shiftVm.promptDismissed = true }) { Text("Not now") }
+                    },
+                    title = { Text("Open a till shift?") },
+                    text = {
+                        Text(
+                            "Count your float and open a shift — sales, returns and cash movements " +
+                                "get tallied so you can balance the drawer at close.",
+                        )
+                    },
+                )
+            }
         }
 
         composable("pos") {
@@ -337,6 +375,15 @@ fun PosApp() {
         }
         composable("scanner-settings") {
             com.nexapos.retail.ui.settings.ScannerSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("drawer-settings") {
+            com.nexapos.retail.ui.settings.DrawerSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("shift") {
+            ShiftScreen(vm = shiftVm, onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("shift-history") {
+            ShiftHistoryScreen(vm = shiftVm, onNav = go, onBack = { navController.popBackStack() })
         }
         composable("staff-settings") {
             com.nexapos.retail.ui.settings.StaffScreen(
