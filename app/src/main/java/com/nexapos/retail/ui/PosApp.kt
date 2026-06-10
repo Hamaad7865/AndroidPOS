@@ -399,6 +399,9 @@ fun PosApp() {
         composable("drawer-settings") {
             com.nexapos.retail.ui.settings.DrawerSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
         }
+        composable("multibranch-settings") {
+            com.nexapos.retail.ui.settings.MultiBranchSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
+        }
         composable("shift") {
             ShiftScreen(vm = shiftVm, onNav = go, onBack = { navController.popBackStack() })
         }

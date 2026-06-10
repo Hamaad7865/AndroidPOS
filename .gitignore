@@ -21,6 +21,9 @@ build/
 .kotlin/
 .cxx/
 
+# Multi-branch licence generator — keep the private key + tooling out of the repo
+/tools/
+
 # Claude Code local state
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
