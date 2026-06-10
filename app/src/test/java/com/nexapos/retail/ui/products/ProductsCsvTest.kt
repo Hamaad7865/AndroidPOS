@@ -48,4 +48,20 @@ class ProductsCsvTest {
         assertEquals(250, row.priceRupees)
         assertEquals(0, row.costRupees) // cost absent → defaults to 0, never leaked
     }
+
+    @Test
+    fun `parse flags whether the cost column was present so import can preserve it`() {
+        // Admin export carries cost → hasCost true.
+        assertTrue(parseProductsCsv(productsCsv(listOf(hammer), includeCost = true)).hasCost)
+        // Cashier export strips cost → hasCost false so the importer preserves it.
+        assertFalse(parseProductsCsv(productsCsv(listOf(hammer), includeCost = false)).hasCost)
+    }
+
+    @Test
+    fun `parse flags a missing stock column so import does not zero stock`() {
+        val priceOnly = "Name,Price (Rs)\r\nClaw Hammer,250\r\n"
+        val parsed = parseProductsCsv(priceOnly)
+        assertFalse(parsed.hasStock)
+        assertEquals(1, parsed.rows.size)
+    }
 }

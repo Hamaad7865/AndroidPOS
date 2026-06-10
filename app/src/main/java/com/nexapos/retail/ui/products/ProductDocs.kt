@@ -80,6 +80,14 @@ internal data class ParsedImport(
     val errors: List<String>,
     /** Set when nothing usable could be parsed (e.g. required columns missing). */
     val fatalError: String? = null,
+    /**
+     * Whether the file actually had a Cost / Stock column. When false the parsed
+     * value is a meaningless 0 (absent cell) and the importer must PRESERVE the
+     * existing product's cost/stock rather than overwrite it with 0 — otherwise a
+     * price-only or cashier (cost-stripped) export silently wipes that data.
+     */
+    val hasCost: Boolean = true,
+    val hasStock: Boolean = true,
 )
 
 private const val MAX_IMPORT_ERRORS = 8
@@ -149,7 +157,7 @@ internal fun parseProductsCsv(text: String): ParsedImport {
         }
     }
     val fatal = if (rows.isEmpty()) "No valid product rows found in the file." else null
-    return ParsedImport(rows, skipped, errors, fatal)
+    return ParsedImport(rows, skipped, errors, fatal, hasCost = costIdx >= 0, hasStock = stockIdx >= 0)
 }
 
 private fun normaliseHeader(raw: String): String = raw.lowercase().filter { it.isLetterOrDigit() }

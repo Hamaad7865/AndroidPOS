@@ -204,18 +204,7 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
                         ?: working.firstOrNull { r.sku.isNotBlank() && it.sku.equals(r.sku.trim(), ignoreCase = true) }
                         ?: working.firstOrNull { r.sku.isBlank() && bc == null && it.name.equals(r.name.trim(), ignoreCase = true) }
                 val base = match ?: Product(name = "", priceCents = 0)
-                val toSave =
-                    base.copy(
-                        id = match?.id ?: 0,
-                        name = r.name.trim(),
-                        sku = r.sku.trim(),
-                        barcode = bc,
-                        priceCents = r.priceRupees * CENTS_PER_RUPEE,
-                        costCents = r.costRupees * CENTS_PER_RUPEE,
-                        stockQty = r.stock,
-                        categoryId = categoryId ?: base.categoryId,
-                        isActive = true,
-                    )
+                val toSave = mergeImportRow(base, r, parsed, categoryId, bc)
                 val savedId = catalogRepository.upsert(toSave)
                 val saved = toSave.copy(id = savedId)
                 if (match != null) {
@@ -230,6 +219,31 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
             onResult(ImportResult(imported, updated, parsed.skipped, parsed.errors, null))
         }
     }
+
+    /**
+     * Builds the product to upsert from a parsed CSV [row]. Cost and stock are
+     * taken from the row only when the file actually had those columns — otherwise
+     * the existing product's values are kept, so a price-only or cashier
+     * (cost-stripped) export never wipes cost/stock. [base] is the matched product
+     * (carrying its id) or a fresh blank one for a new SKU.
+     */
+    private fun mergeImportRow(
+        base: Product,
+        row: ImportRow,
+        parsed: ParsedImport,
+        categoryId: Long?,
+        barcode: String?,
+    ): Product =
+        base.copy(
+            name = row.name.trim(),
+            sku = row.sku.trim(),
+            barcode = barcode,
+            priceCents = row.priceRupees * CENTS_PER_RUPEE,
+            costCents = if (parsed.hasCost) row.costRupees * CENTS_PER_RUPEE else base.costCents,
+            stockQty = if (parsed.hasStock) row.stock else base.stockQty,
+            categoryId = categoryId ?: base.categoryId,
+            isActive = true,
+        )
 
     private suspend fun resolveLookupId(
         name: String,

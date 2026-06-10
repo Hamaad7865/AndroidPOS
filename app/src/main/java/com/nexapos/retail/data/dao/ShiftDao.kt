@@ -82,7 +82,7 @@ interface ShiftDao {
     @Query(
         "SELECT COUNT(*) AS count, COALESCE(SUM(totalCents), 0) AS cents, " +
             "COALESCE(SUM(CASE WHEN refundMethod = 'CASH' THEN totalCents ELSE 0 END), 0) AS cashCents " +
-            "FROM sale_returns WHERE shiftId = :shiftId",
+            "FROM sale_returns WHERE shiftId = :shiftId AND status = 'COMPLETED'",
     )
     suspend fun returnsTotal(shiftId: Long): ReturnsTotal
 
