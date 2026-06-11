@@ -55,4 +55,16 @@ interface ProductDao {
 
     @Delete
     suspend fun delete(product: Product)
+
+    /** How many sale lines reference this product (drives the delete-vs-archive warning). */
+    @Query("SELECT COUNT(*) FROM sale_items WHERE productId = :id")
+    suspend fun saleLineCount(id: Long): Int
+
+    /** How many purchase lines reference this product. */
+    @Query("SELECT COUNT(*) FROM purchase_items WHERE productId = :id")
+    suspend fun purchaseLineCount(id: Long): Int
+
+    /** Soft-delete: hide from the catalog/POS but keep the row and its history. */
+    @Query("UPDATE products SET isActive = 0 WHERE id = :id")
+    suspend fun setArchived(id: Long)
 }
