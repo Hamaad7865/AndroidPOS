@@ -2,7 +2,9 @@ package com.nexapos.retail.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,10 +24,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.data.branch.BranchIdentity
 import com.nexapos.retail.data.branch.MultiBranch
 import com.nexapos.retail.data.profile.BusinessProfile
 import com.nexapos.retail.ui.components.AppBar
@@ -53,6 +57,10 @@ fun MultiBranchSettingsScreen(
     var license by remember { mutableStateOf(MultiBranch.license(context)) }
     var code by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var role by remember { mutableStateOf(BranchIdentity.role(context)) }
+    var branchCode by remember { mutableStateOf(BranchIdentity.code(context)) }
+    var branchName by remember { mutableStateOf(BranchIdentity.name(context)) }
+    var idSaved by remember { mutableStateOf(false) }
 
     NavShell(active = "settings", onNav = onNav) {
         AppBar(
@@ -138,11 +146,68 @@ fun MultiBranchSettingsScreen(
                         }
                     }
                     Card {
+                        Eyebrow("This shop")
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Tell the network who this device is. Head office can view every branch; a branch " +
+                                "publishes its own sales & stock and views the branches it's allowed to.",
+                            fontSize = 11.sp,
+                            color = c.muted,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text("Role", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            RoleChip("Branch", role == BranchIdentity.Role.BRANCH) {
+                                role = BranchIdentity.Role.BRANCH
+                                idSaved = false
+                            }
+                            RoleChip("Head office", role == BranchIdentity.Role.HQ) {
+                                role = BranchIdentity.Role.HQ
+                                idSaved = false
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        EditableField(
+                            "Branch code (max 4 · e.g. A, HQ, CUR1)",
+                            branchCode,
+                            {
+                                branchCode = BranchIdentity.normalizeCode(it)
+                                idSaved = false
+                            },
+                            Modifier.fillMaxWidth(),
+                            mono = true,
+                            placeholder = "A",
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        EditableField(
+                            "Display name",
+                            branchName,
+                            {
+                                branchName = it
+                                idSaved = false
+                            },
+                            Modifier.fillMaxWidth(),
+                            placeholder = "Curepipe branch",
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        WideBtn(
+                            if (idSaved) "Saved ✓" else "Save this shop",
+                            primary = true,
+                            Modifier.fillMaxWidth(),
+                            icon = PosIcons.check,
+                        ) {
+                            BranchIdentity.set(context, role, branchCode, branchName)
+                            branchCode = BranchIdentity.code(context)
+                            idSaved = true
+                        }
+                    }
+                    Card {
                         Eyebrow("Next")
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Branch setup (head office vs branch, and which branches can see each other) and " +
-                                "cross-branch viewing arrive in upcoming updates.",
+                            "Cloud sync (so branches can see each other) and the Branches screen arrive in the next " +
+                                "updates — they need a one-time Firebase project setup, covered in docs/FIREBASE_SETUP.md.",
                             fontSize = 12.sp,
                             color = c.muted,
                         )
@@ -165,6 +230,25 @@ private fun InfoRow(
     ) {
         Text(label, fontSize = 13.sp, color = c.muted)
         Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+    }
+}
+
+@Composable
+private fun RoleChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) c.amber else c.raised2)
+            .border(1.dp, if (selected) c.amber else c.hairline, RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 18.dp, vertical = 9.dp),
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Color.White else c.ink)
     }
 }
 
