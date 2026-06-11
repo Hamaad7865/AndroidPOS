@@ -60,7 +60,6 @@ import com.nexapos.retail.data.barcode.BarcodeScanner
 import com.nexapos.retail.data.barcode.Ean13
 import com.nexapos.retail.data.entity.VatType
 import com.nexapos.retail.data.media.ImageStore
-import com.nexapos.retail.data.profile.BusinessProfile
 import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.Ean13Bars
 import com.nexapos.retail.ui.components.EditableField
@@ -232,15 +231,7 @@ fun ProductsListScreen(
                             exportLauncher.launch("nexapos-products.csv")
                         }
                     }
-                    SecBtn(PosIcons.print, "Print labels") {
-                        val withCodes = vm.products.filter { it.barcode != null && Ean13.isValid(it.barcode) }
-                        val toPrint = if (withCodes.isEmpty()) vm.products else withCodes
-                        if (toPrint.isEmpty()) {
-                            Toast.makeText(context, "No products to print", Toast.LENGTH_SHORT).show()
-                        } else {
-                            printProductLabels(context, toPrint, BusinessProfile.name(context))
-                        }
-                    }
+                    SecBtn(PosIcons.print, "Print labels") { onNav("labels") }
                     PrimaryBtn(PosIcons.plus, "Add product", onAddProduct)
                 }
             },
@@ -567,7 +558,7 @@ private fun ImportResultDialog(
 // Print via Android system print framework (renders an off-screen WebView).
 // ---------------------------------------------------------------------------
 
-private fun printProductLabels(
+internal fun printProductLabels(
     context: Context,
     products: List<PosProduct>,
     businessName: String,

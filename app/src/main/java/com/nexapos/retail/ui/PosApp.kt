@@ -402,6 +402,13 @@ fun PosApp() {
         composable("label-printer-settings") {
             com.nexapos.retail.ui.settings.LabelPrinterSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
         }
+        composable("labels") {
+            com.nexapos.retail.ui.labels.LabelPrintScreen(
+                vm = viewModel(factory = AppViewModelProvider.Factory),
+                onNav = go,
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable("shift") {
             ShiftScreen(vm = shiftVm, onNav = go, onBack = { navController.popBackStack() })
         }
