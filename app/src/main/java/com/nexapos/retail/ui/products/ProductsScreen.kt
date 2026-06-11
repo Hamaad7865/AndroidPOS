@@ -501,7 +501,7 @@ private fun ImportHelpDialog(
                 Text("Columns", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
                 Text(
                     "• Name — required\n" +
-                        "• Price — required (whole rupees)\n" +
+                        "• Price — required (e.g. 12.50)\n" +
                         "• SKU, Barcode, Category, Cost, Stock — optional",
                     fontFamily = JetBrainsMono,
                     fontSize = 12.sp,
