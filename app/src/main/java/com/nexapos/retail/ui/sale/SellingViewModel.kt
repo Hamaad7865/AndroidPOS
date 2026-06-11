@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nexapos.retail.data.branch.BranchSync
 import com.nexapos.retail.data.entity.Party
 import com.nexapos.retail.data.entity.Sale
 import com.nexapos.retail.data.entity.SaleItem
@@ -121,6 +122,7 @@ class SellingViewModel(
     private val drawerKicker: DrawerKicker,
     private val shiftRepository: ShiftRepository,
     private val session: StaffSession,
+    private val branchSync: BranchSync,
 ) : ViewModel() {
     /** The till shift currently open, if any — new sales are stamped with it. */
     var openShift by mutableStateOf<Shift?>(null)
@@ -617,6 +619,8 @@ class SellingViewModel(
                 // Pop the cash drawer to take the money / give change. Fire-and-forget:
                 // the sale is already committed and never waits on the printer.
                 if (sale.paymentMethod == "CASH") drawerKicker.kick(KickReason.CASH_SALE)
+                // Publish the branch's updated summary to the cloud (no-op unless multi-branch is on).
+                branchSync.onSaleRecorded()
                 // Bump the local preview counter so "New ticket S-XXXXX ready" shows the next seq.
                 saleCount++
                 nextInvoiceNo = formatInvoice(STARTING_INVOICE + saleCount + 1)

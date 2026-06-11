@@ -33,6 +33,7 @@ object AppViewModelProvider {
                     drawerKicker = c.drawerKicker,
                     shiftRepository = c.shiftRepository,
                     session = c.session,
+                    branchSync = c.branchSync,
                 )
             }
             initializer {
@@ -113,6 +114,7 @@ object AppViewModelProvider {
                 ShiftViewModel(
                     shiftRepository = c.shiftRepository,
                     session = c.session,
+                    branchSync = c.branchSync,
                 )
             }
             initializer {

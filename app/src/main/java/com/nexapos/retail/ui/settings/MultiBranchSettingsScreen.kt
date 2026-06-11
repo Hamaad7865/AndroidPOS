@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,9 +30,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nexapos.retail.PosApplication
 import com.nexapos.retail.data.branch.BranchIdentity
+import com.nexapos.retail.data.branch.FirebaseConfig
 import com.nexapos.retail.data.branch.MultiBranch
+import com.nexapos.retail.data.branch.SyncResult
 import com.nexapos.retail.data.profile.BusinessProfile
+import com.nexapos.retail.di.AppContainer
 import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.EditableField
 import com.nexapos.retail.ui.components.Eyebrow
@@ -40,6 +45,7 @@ import com.nexapos.retail.ui.components.PosIcons
 import com.nexapos.retail.ui.components.SecBtn
 import com.nexapos.retail.ui.components.WideBtn
 import com.nexapos.retail.ui.theme.PosTheme
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
@@ -61,6 +67,16 @@ fun MultiBranchSettingsScreen(
     var branchCode by remember { mutableStateOf(BranchIdentity.code(context)) }
     var branchName by remember { mutableStateOf(BranchIdentity.name(context)) }
     var idSaved by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val container = remember { (context.applicationContext as PosApplication).container }
+    val initialFb = remember { FirebaseConfig.config(context) }
+    var projectId by remember { mutableStateOf(initialFb?.projectId ?: "") }
+    var appId by remember { mutableStateOf(initialFb?.appId ?: "") }
+    var apiKey by remember { mutableStateOf(initialFb?.apiKey ?: "") }
+    var email by remember { mutableStateOf(FirebaseConfig.email(context)) }
+    var password by remember { mutableStateOf("") }
+    var syncMsg by remember { mutableStateOf<String?>(null) }
+    var syncing by remember { mutableStateOf(false) }
 
     NavShell(active = "settings", onNav = onNav) {
         AppBar(
@@ -203,11 +219,80 @@ fun MultiBranchSettingsScreen(
                         }
                     }
                     Card {
+                        Eyebrow("Cloud sync (Firebase)")
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Connect this shop to your Firebase project so it can share with the other branches. " +
+                                "Copy these three values from the Firebase console (Project settings → your Android " +
+                                "app), then sign in with your business account. See docs/FIREBASE_SETUP.md.",
+                            fontSize = 11.sp,
+                            color = c.muted,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        EditableField("Project ID", projectId, {
+                            projectId = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), mono = true, placeholder = "my-shop-12345")
+                        Spacer(Modifier.height(8.dp))
+                        EditableField("App ID", appId, {
+                            appId = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), mono = true, placeholder = "1:123…:android:abc…")
+                        Spacer(Modifier.height(8.dp))
+                        EditableField("API key", apiKey, {
+                            apiKey = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), mono = true, placeholder = "AIza…")
+                        Spacer(Modifier.height(12.dp))
+                        EditableField("Business email", email, {
+                            email = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), placeholder = "owner@myshop.mu")
+                        Spacer(Modifier.height(8.dp))
+                        EditableField("Password", password, {
+                            password = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), placeholder = "your account password")
+                        syncMsg?.let { msg ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(msg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        WideBtn(
+                            if (syncing) "Working…" else "Connect & sync",
+                            primary = true,
+                            Modifier.fillMaxWidth(),
+                            icon = PosIcons.check,
+                        ) {
+                            when {
+                                branchCode.isBlank() -> syncMsg = "Save your branch code above first."
+                                projectId.isBlank() || appId.isBlank() || apiKey.isBlank() || email.isBlank() || password.isBlank() ->
+                                    syncMsg = "Fill in all the Firebase and account fields."
+                                else -> {
+                                    FirebaseConfig.save(context, projectId, appId, apiKey, email)
+                                    syncing = true
+                                    syncMsg = "Connecting…"
+                                    val pwd = password
+                                    scope.launch {
+                                        val result = connectAndSync(container, email.trim(), pwd)
+                                        syncMsg =
+                                            if (result is SyncResult.Ok) {
+                                                "Connected & synced ✓"
+                                            } else {
+                                                "Couldn't sync — check the details and your network."
+                                            }
+                                        syncing = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Card {
                         Eyebrow("Next")
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Cloud sync (so branches can see each other) and the Branches screen arrive in the next " +
-                                "updates — they need a one-time Firebase project setup, covered in docs/FIREBASE_SETUP.md.",
+                            "The Branches screen (view the shops you're allowed to) and head-office controls arrive " +
+                                "in the next update.",
                             fontSize = 12.sp,
                             color = c.muted,
                         )
@@ -232,6 +317,19 @@ private fun InfoRow(
         Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
     }
 }
+
+@Suppress("TooGenericExceptionCaught") // any sign-in / network error → friendly failure, never a crash
+private suspend fun connectAndSync(
+    container: AppContainer,
+    email: String,
+    password: String,
+): SyncResult =
+    try {
+        container.multiBranchRemoteStore()?.signIn(email, password, createIfNew = true)
+        container.branchSync.syncNow()
+    } catch (e: Exception) {
+        SyncResult.Failed(e.message ?: "Sign-in failed")
+    }
 
 @Composable
 private fun RoleChip(

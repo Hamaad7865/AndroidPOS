@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nexapos.retail.data.branch.BranchSync
 import com.nexapos.retail.data.entity.Shift
 import com.nexapos.retail.data.entity.isAdmin
 import com.nexapos.retail.data.security.StaffSession
@@ -27,6 +28,7 @@ private const val STOP_TIMEOUT_MS = 5_000L
 class ShiftViewModel(
     private val shiftRepository: ShiftRepository,
     private val session: StaffSession,
+    private val branchSync: BranchSync,
 ) : ViewModel() {
     val openShift: StateFlow<Shift?> =
         shiftRepository.observeOpenShift()
@@ -122,6 +124,7 @@ class ShiftViewModel(
                 )
                 justClosed = shiftRepository.summary(shift.id)
                 error = null
+                branchSync.onShiftClosed()
             } catch (e: IllegalStateException) {
                 error = e.message
             } finally {

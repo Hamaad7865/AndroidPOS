@@ -1,6 +1,7 @@
 package com.nexapos.retail.ui.sale
 
 import com.nexapos.retail.MainDispatcherRule
+import com.nexapos.retail.data.branch.NoopBranchSync
 import com.nexapos.retail.data.entity.Category
 import com.nexapos.retail.data.entity.Product
 import com.nexapos.retail.data.entity.Shift
@@ -41,7 +42,7 @@ class SellingViewModelTest {
     private val session = StaffSession()
 
     // The dispatcher rule is unconfined, so the VM's init coroutines run eagerly on construction.
-    private fun vm() = SellingViewModel(catalog, sales, parties, drawer, shifts, session)
+    private fun vm() = SellingViewModel(catalog, sales, parties, drawer, shifts, session, NoopBranchSync)
 
     @Test
     fun `catalog is mapped to cents display products`() =
@@ -140,7 +141,7 @@ class SellingViewModelTest {
     fun `complete sets saleError when repository throws`() =
         runTest {
             val failingSales = FakeSalesRepository(failOnRecord = true)
-            val model = SellingViewModel(catalog, failingSales, parties, drawer, shifts, session)
+            val model = SellingViewModel(catalog, failingSales, parties, drawer, shifts, session, NoopBranchSync)
             val wrench = model.products.first { it.sku == "WRN-T17" }
             model.addToCart(wrench)
             model.beginCheckout()
@@ -180,7 +181,7 @@ class SellingViewModelTest {
         runTest {
             val failingSales = FakeSalesRepository(failOnRecord = true)
             val localDrawer = FakeDrawerKicker()
-            val model = SellingViewModel(catalog, failingSales, parties, localDrawer, shifts, session)
+            val model = SellingViewModel(catalog, failingSales, parties, localDrawer, shifts, session, NoopBranchSync)
             val wrench = model.products.first { it.sku == "WRN-T17" }
             model.addToCart(wrench)
             model.beginCheckout()
@@ -199,7 +200,7 @@ class SellingViewModelTest {
             session.login(
                 Staff(id = 9, name = "Priya", pinHash = "h", pinSalt = "s", role = StaffRole.CASHIER.name, createdAt = 0L),
             )
-            val model = SellingViewModel(catalog, sales, parties, drawer, openShifts, session)
+            val model = SellingViewModel(catalog, sales, parties, drawer, openShifts, session, NoopBranchSync)
             val wrench = model.products.first { it.sku == "WRN-T17" }
             model.addToCart(wrench)
             model.beginCheckout()
