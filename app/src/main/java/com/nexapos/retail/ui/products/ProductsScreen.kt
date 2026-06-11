@@ -233,15 +233,7 @@ fun ProductsListScreen(
                             exportLauncher.launch("nexapos-products.csv")
                         }
                     }
-                    SecBtn(PosIcons.print, "Print labels") {
-                        val withCodes = vm.products.filter { it.barcode != null && Ean13.isValid(it.barcode) }
-                        val toPrint = if (withCodes.isEmpty()) vm.products else withCodes
-                        if (toPrint.isEmpty()) {
-                            Toast.makeText(context, "No products to print", Toast.LENGTH_SHORT).show()
-                        } else {
-                            printProductLabels(context, toPrint, BusinessProfile.name(context))
-                        }
-                    }
+                    SecBtn(PosIcons.print, "Print labels") { onNav("labels") }
                     PrimaryBtn(PosIcons.plus, "Add product", onAddProduct)
                 }
             },
@@ -511,7 +503,7 @@ private fun ImportHelpDialog(
                 Text("Columns", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
                 Text(
                     "• Name — required\n" +
-                        "• Price — required (whole rupees)\n" +
+                        "• Price — required (e.g. 12.50)\n" +
                         "• SKU, Barcode, Category, Cost, Stock — optional",
                     fontFamily = JetBrainsMono,
                     fontSize = 12.sp,
@@ -568,7 +560,7 @@ private fun ImportResultDialog(
 // Print via Android system print framework (renders an off-screen WebView).
 // ---------------------------------------------------------------------------
 
-private fun printProductLabels(
+internal fun printProductLabels(
     context: Context,
     products: List<PosProduct>,
     businessName: String,

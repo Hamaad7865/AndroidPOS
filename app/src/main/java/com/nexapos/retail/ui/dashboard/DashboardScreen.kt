@@ -138,7 +138,7 @@ fun DashboardScreen(
                         QuickTile("Add product", PosIcons.box, c.ink, Modifier.weight(1f)) { onNav("products") }
                         QuickTile("Record expense", PosIcons.wallet, c.crimson, Modifier.weight(1f)) { onNav("money") }
                         QuickTile("Purchase", PosIcons.truck, c.graphite, Modifier.weight(1f)) { onNav("purchase") }
-                        QuickTile("Print labels", PosIcons.barcode, c.ink, Modifier.weight(1f)) { onNav("products") }
+                        QuickTile("Print labels", PosIcons.barcode, c.ink, Modifier.weight(1f)) { onNav("labels") }
                     }
                 }
                 LiveActivityCard(

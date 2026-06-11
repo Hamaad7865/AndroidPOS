@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.nexapos.retail.PosApplication
 import com.nexapos.retail.ui.dashboard.DashboardViewModel
+import com.nexapos.retail.ui.labels.LabelPrintViewModel
 import com.nexapos.retail.ui.money.MoneyViewModel
 import com.nexapos.retail.ui.parties.PartiesViewModel
 import com.nexapos.retail.ui.products.CatalogViewModel
@@ -36,6 +37,13 @@ object AppViewModelProvider {
             }
             initializer {
                 CatalogViewModel(catalogRepository = posApplication().container.catalogRepository)
+            }
+            initializer {
+                val c = posApplication().container
+                LabelPrintViewModel(
+                    catalogRepository = c.catalogRepository,
+                    labelPrinter = c.labelPrinter,
+                )
             }
             initializer {
                 val c = posApplication().container
