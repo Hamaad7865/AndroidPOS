@@ -28,6 +28,8 @@ class RealBranchSyncTest {
         money = FakeMoneyRepository(),
         shifts = FakeShiftRepository(),
         branchCode = "A",
+        branchName = "Curepipe",
+        isHq = false,
         scope = scope,
         zone = ZoneId.of("UTC"),
         // Fixed clock: 2023-11-14T22:13:20Z.

@@ -13,6 +13,7 @@ import com.nexapos.retail.data.PosDatabase
 import com.nexapos.retail.data.branch.BranchIdentity
 import com.nexapos.retail.data.branch.BranchSync
 import com.nexapos.retail.data.branch.FirebaseConfig
+import com.nexapos.retail.data.branch.FirestoreRemoteBranchRepository
 import com.nexapos.retail.data.branch.FirestoreRemoteStore
 import com.nexapos.retail.data.branch.MultiBranch
 import com.nexapos.retail.data.branch.NoopBranchSync
@@ -29,6 +30,7 @@ import com.nexapos.retail.data.repository.RoomShiftRepository
 import com.nexapos.retail.data.repository.RoomStaffRepository
 import com.nexapos.retail.data.security.DbKeyManager
 import com.nexapos.retail.data.security.StaffSession
+import com.nexapos.retail.domain.branch.RemoteBranchRepository
 import com.nexapos.retail.domain.branch.RemoteStore
 import com.nexapos.retail.domain.hardware.DrawerKicker
 import com.nexapos.retail.domain.hardware.LabelPrinter
@@ -147,6 +149,8 @@ class AppContainer(context: Context) {
             money = moneyRepository,
             shifts = shiftRepository,
             branchCode = BranchIdentity.code(appContext),
+            branchName = BranchIdentity.name(appContext),
+            isHq = BranchIdentity.role(appContext) == BranchIdentity.Role.HQ,
             scope = appScope,
         )
     }
@@ -154,6 +158,10 @@ class AppContainer(context: Context) {
     /** A fresh [RemoteStore] for the Settings sign-in flow, or null if Firebase isn't configured. */
     fun multiBranchRemoteStore(): RemoteStore? =
         FirebaseConfig.config(appContext)?.let { FirestoreRemoteStore(appContext, it) }
+
+    /** Reads other branches' synced data, or null when Firebase isn't configured. */
+    fun remoteBranches(): RemoteBranchRepository? =
+        multiBranchRemoteStore()?.let { FirestoreRemoteBranchRepository(it) }
 
     /** Flushes the write-ahead log into the main DB file so a file copy is a complete backup. */
     fun checkpoint() {

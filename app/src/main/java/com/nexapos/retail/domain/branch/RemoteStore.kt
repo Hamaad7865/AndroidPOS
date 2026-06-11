@@ -43,4 +43,7 @@ interface RemoteStore {
 
     /** Live updates of the document at [path] (emits null while it doesn't exist). */
     fun observeDoc(path: String): Flow<Map<String, Any?>?>
+
+    /** Live updates of the documents directly under the collection at [collectionPath]. */
+    fun observeCollection(collectionPath: String): Flow<List<Map<String, Any?>>>
 }

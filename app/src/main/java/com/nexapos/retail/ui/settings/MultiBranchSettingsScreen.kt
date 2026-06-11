@@ -287,15 +287,10 @@ fun MultiBranchSettingsScreen(
                             }
                         }
                     }
-                    Card {
-                        Eyebrow("Next")
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "The Branches screen (view the shops you're allowed to) and head-office controls arrive " +
-                                "in the next update.",
-                            fontSize = 12.sp,
-                            color = c.muted,
-                        )
+                    if (branchCode.isNotBlank()) {
+                        WideBtn("View branches", primary = false, Modifier.fillMaxWidth(), icon = PosIcons.home) {
+                            onNav("branches")
+                        }
                     }
                 }
             }

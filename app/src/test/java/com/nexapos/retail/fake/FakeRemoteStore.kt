@@ -47,4 +47,12 @@ class FakeRemoteStore(
             .distinct()
 
     override fun observeDoc(path: String): Flow<Map<String, Any?>?> = MutableStateFlow(written[path])
+
+    override fun observeCollection(collectionPath: String): Flow<List<Map<String, Any?>>> =
+        MutableStateFlow(
+            written
+                .filterKeys { it.startsWith("$collectionPath/") && !it.removePrefix("$collectionPath/").contains("/") }
+                .values
+                .toList(),
+        )
 }

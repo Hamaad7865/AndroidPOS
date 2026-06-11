@@ -78,6 +78,15 @@ class FirestoreRemoteStore(
             awaitClose { registration.remove() }
         }
 
+    override fun observeCollection(collectionPath: String): Flow<List<Map<String, Any?>>> =
+        callbackFlow {
+            val registration =
+                db.collection(collectionPath).addSnapshotListener { snapshot, _ ->
+                    trySend(snapshot?.documents?.mapNotNull { it.data } ?: emptyList())
+                }
+            awaitClose { registration.remove() }
+        }
+
     companion object {
         private const val APP_NAME = "nexapos-mb"
     }

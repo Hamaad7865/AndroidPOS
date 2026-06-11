@@ -89,6 +89,10 @@ internal object BranchPaths {
         code: String,
         date: String,
     ) = "${branch(uid, code)}/days/$date"
+
+    fun branchesCollection(uid: String) = "businesses/$uid/branches"
+
+    fun visibility(uid: String) = "businesses/$uid/config/visibility"
 }
 
 /** Pure entity→DTO assembly for the sync engine (no I/O), so it is unit-testable. */
@@ -164,6 +168,8 @@ class RealBranchSync(
     private val money: MoneyRepository,
     private val shifts: ShiftRepository,
     private val branchCode: String,
+    private val branchName: String,
+    private val isHq: Boolean,
     private val scope: CoroutineScope,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val now: () -> Long = System::currentTimeMillis,
@@ -190,6 +196,7 @@ class RealBranchSync(
             }
             _status.value = _status.value.copy(state = SyncState.SYNCING)
             runCatching {
+                registerSelf(uid)
                 pushSummaryFor(uid)
                 pushStockFor(uid)
                 pushTodayFor(uid)
@@ -209,6 +216,11 @@ class RealBranchSync(
         val uid = remote.signedInUid() ?: return
         mutex.withLock { pushSummaryFor(uid) }
         _status.value = SyncStatus(SyncState.OK, lastSyncAt = now())
+    }
+
+    /** Publishes this branch's directory entry so head office / peers can find it. */
+    private suspend fun registerSelf(uid: String) {
+        remote.setDoc(BranchPaths.branch(uid, branchCode), BranchRef(branchCode, branchName, isHq).toMap())
     }
 
     private suspend fun pushSummaryFor(uid: String) {
