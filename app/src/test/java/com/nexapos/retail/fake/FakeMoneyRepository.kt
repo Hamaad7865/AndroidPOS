@@ -16,7 +16,7 @@ class FakeMoneyRepository(initial: List<MoneyTxn> = emptyList()) : MoneyReposito
     override fun observeExpenses(): Flow<List<MoneyTxn>> =
         txns.map { list -> list.filter { it.type == MoneyTxn.TYPE_EXPENSE } }
 
-    override fun observeRecent(): Flow<List<MoneyTxn>> = txns
+    override fun observeRecent(limit: Int): Flow<List<MoneyTxn>> = txns
 
     override fun observeSumSince(
         type: String,

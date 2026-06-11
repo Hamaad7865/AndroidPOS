@@ -10,6 +10,14 @@ import com.nexapos.retail.data.MIGRATION_7_8
 import com.nexapos.retail.data.MIGRATION_8_9
 import com.nexapos.retail.data.MIGRATION_9_10
 import com.nexapos.retail.data.PosDatabase
+import com.nexapos.retail.data.branch.BranchIdentity
+import com.nexapos.retail.data.branch.BranchSync
+import com.nexapos.retail.data.branch.FirebaseConfig
+import com.nexapos.retail.data.branch.FirestoreRemoteBranchRepository
+import com.nexapos.retail.data.branch.FirestoreRemoteStore
+import com.nexapos.retail.data.branch.MultiBranch
+import com.nexapos.retail.data.branch.NoopBranchSync
+import com.nexapos.retail.data.branch.RealBranchSync
 import com.nexapos.retail.data.hardware.drawer.EscPosDrawerKicker
 import com.nexapos.retail.data.hardware.labels.TsplLabelPrinter
 import com.nexapos.retail.data.repository.RoomCatalogRepository
@@ -22,6 +30,8 @@ import com.nexapos.retail.data.repository.RoomShiftRepository
 import com.nexapos.retail.data.repository.RoomStaffRepository
 import com.nexapos.retail.data.security.DbKeyManager
 import com.nexapos.retail.data.security.StaffSession
+import com.nexapos.retail.domain.branch.RemoteBranchRepository
+import com.nexapos.retail.domain.branch.RemoteStore
 import com.nexapos.retail.domain.hardware.DrawerKicker
 import com.nexapos.retail.domain.hardware.LabelPrinter
 import com.nexapos.retail.domain.repository.CatalogRepository
@@ -32,6 +42,9 @@ import com.nexapos.retail.domain.repository.ReturnsRepository
 import com.nexapos.retail.domain.repository.SalesRepository
 import com.nexapos.retail.domain.repository.ShiftRepository
 import com.nexapos.retail.domain.repository.StaffRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import net.sqlcipher.database.SupportFactory
 
 /**
@@ -106,6 +119,49 @@ class AppContainer(context: Context) {
 
     /** Who is signed in at this till. In-memory; cleared on every cold start. */
     val session = StaffSession()
+
+    /** App-lifetime scope for fire-and-forget background work (branch sync). */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private var cachedBranchSync: BranchSync? = null
+
+    /**
+     * Multi-branch sync engine. Stays [NoopBranchSync] until the add-on is
+     * licensed, a branch identity is set, AND a Firebase project is configured;
+     * once all three hold it builds (and caches) the real Firestore-backed engine.
+     * A fresh configuration takes effect on the next app start.
+     */
+    val branchSync: BranchSync
+        get() {
+            (cachedBranchSync as? RealBranchSync)?.let { return it }
+            return buildBranchSync().also { cachedBranchSync = it }
+        }
+
+    private fun buildBranchSync(): BranchSync {
+        if (!MultiBranch.licensed(appContext)) return NoopBranchSync
+        if (!BranchIdentity.isConfigured(appContext)) return NoopBranchSync
+        val config = FirebaseConfig.config(appContext) ?: return NoopBranchSync
+        return RealBranchSync(
+            remote = FirestoreRemoteStore(appContext, config),
+            sales = salesRepository,
+            catalog = catalogRepository,
+            returns = returnsRepository,
+            money = moneyRepository,
+            shifts = shiftRepository,
+            branchCode = BranchIdentity.code(appContext),
+            branchName = BranchIdentity.name(appContext),
+            isHq = BranchIdentity.role(appContext) == BranchIdentity.Role.HQ,
+            scope = appScope,
+        )
+    }
+
+    /** A fresh [RemoteStore] for the Settings sign-in flow, or null if Firebase isn't configured. */
+    fun multiBranchRemoteStore(): RemoteStore? =
+        FirebaseConfig.config(appContext)?.let { FirestoreRemoteStore(appContext, it) }
+
+    /** Reads other branches' synced data, or null when Firebase isn't configured. */
+    fun remoteBranches(): RemoteBranchRepository? =
+        multiBranchRemoteStore()?.let { FirestoreRemoteBranchRepository(it) }
 
     /** Flushes the write-ahead log into the main DB file so a file copy is a complete backup. */
     fun checkpoint() {

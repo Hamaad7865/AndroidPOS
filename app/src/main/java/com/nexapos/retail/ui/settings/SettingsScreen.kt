@@ -80,6 +80,12 @@ private fun groups(admin: Boolean) =
             ),
         ).takeIf { admin },
         SettingGroup(
+            "Add-ons",
+            listOf(
+                SettingItem(PosIcons.home, "Multi-branch", "Link branches & head office · paid add-on", "multibranch-settings"),
+            ),
+        ).takeIf { admin },
+        SettingGroup(
             "Receipt & hardware",
             listOf(
                 SettingItem(PosIcons.print, "Printing & receipt", "Paper size, footer, test print", "printing-settings"),

@@ -13,7 +13,7 @@ class FakeReturnsRepository(
     private val returns = MutableStateFlow(seeded.map { it.first })
     private val itemsByReturnId = seeded.associate { it.first.id to it.second }
 
-    override fun observeRecent(): Flow<List<SaleReturn>> = returns
+    override fun observeRecent(limit: Int): Flow<List<SaleReturn>> = returns
 
     override fun observeTotalSince(since: Long): Flow<Long> =
         MutableStateFlow(returns.value.filter { it.createdAt >= since }.sumOf { it.totalCents })

@@ -11,7 +11,7 @@ class RoomMoneyRepository(private val moneyTxnDao: MoneyTxnDao) : MoneyRepositor
 
     override fun observeExpenses(): Flow<List<MoneyTxn>> = moneyTxnDao.observeByType(MoneyTxn.TYPE_EXPENSE)
 
-    override fun observeRecent(): Flow<List<MoneyTxn>> = moneyTxnDao.observeRecent()
+    override fun observeRecent(limit: Int): Flow<List<MoneyTxn>> = moneyTxnDao.observeRecent(limit)
 
     override fun observeSumSince(
         type: String,

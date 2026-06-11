@@ -18,8 +18,8 @@ android {
         applicationId = "com.nexapos.retail"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -135,6 +135,13 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.play.services.code.scanner)
     implementation(libs.mlkit.text.recognition)
+
+    // Multi-branch add-on (optional, paid): Firestore + Auth. Initialised lazily from
+    // the owner's pasted config — no google-services plugin / google-services.json.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.kotlinx.coroutines.android)
 

@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 /** Room-backed [SalesRepository]. Atomicity is provided by [SaleDao]. */
 class RoomSalesRepository(private val saleDao: SaleDao) : SalesRepository {
-    override fun observeRecent(): Flow<List<Sale>> = saleDao.observeRecent()
+    override fun observeRecent(limit: Int): Flow<List<Sale>> = saleDao.observeRecent(limit)
 
     override fun observeTotalSince(since: Long): Flow<Long> = saleDao.observeTotalSince(since)
 

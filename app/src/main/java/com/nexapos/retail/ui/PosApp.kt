@@ -21,6 +21,9 @@ import com.nexapos.retail.data.security.StaffAuthenticator
 import com.nexapos.retail.ui.auth.BusinessSetupScreen
 import com.nexapos.retail.ui.auth.LoginScreen
 import com.nexapos.retail.ui.auth.SplashScreen
+import com.nexapos.retail.ui.branches.BranchesScreen
+import com.nexapos.retail.ui.branches.RemoteBranchScreen
+import com.nexapos.retail.ui.branches.VisibilityEditorScreen
 import com.nexapos.retail.ui.checkout.PosCheckoutScreen
 import com.nexapos.retail.ui.checkout.PosReceiptScreen
 import com.nexapos.retail.ui.dashboard.DashboardScreen
@@ -398,6 +401,26 @@ fun PosApp() {
         }
         composable("drawer-settings") {
             com.nexapos.retail.ui.settings.DrawerSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("multibranch-settings") {
+            com.nexapos.retail.ui.settings.MultiBranchSettingsScreen(onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("branches") {
+            BranchesScreen(
+                onNav = go,
+                onOpenBranch = { code -> go("remote-branch/$code") },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(
+            "remote-branch/{code}",
+            arguments = listOf(androidx.navigation.navArgument("code") { type = androidx.navigation.NavType.StringType }),
+        ) { backStackEntry ->
+            val code = backStackEntry.arguments?.getString("code").orEmpty()
+            RemoteBranchScreen(code = code, onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("branch-visibility") {
+            VisibilityEditorScreen(onNav = go, onBack = { navController.popBackStack() })
         }
         composable("label-printer-settings") {
             com.nexapos.retail.ui.settings.LabelPrinterSettingsScreen(onNav = go, onBack = { navController.popBackStack() })

@@ -1,0 +1,361 @@
+package com.nexapos.retail.ui.settings
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.nexapos.retail.PosApplication
+import com.nexapos.retail.data.branch.BranchIdentity
+import com.nexapos.retail.data.branch.FirebaseConfig
+import com.nexapos.retail.data.branch.MultiBranch
+import com.nexapos.retail.data.branch.SyncResult
+import com.nexapos.retail.data.profile.BusinessProfile
+import com.nexapos.retail.di.AppContainer
+import com.nexapos.retail.ui.components.AppBar
+import com.nexapos.retail.ui.components.EditableField
+import com.nexapos.retail.ui.components.Eyebrow
+import com.nexapos.retail.ui.components.NavShell
+import com.nexapos.retail.ui.components.PosIcons
+import com.nexapos.retail.ui.components.SecBtn
+import com.nexapos.retail.ui.components.WideBtn
+import com.nexapos.retail.ui.theme.PosTheme
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+
+/**
+ * Settings → Multi-branch. Entry point for the paid multi-branch add-on: enter
+ * the offline licence key to unlock it, or view / remove an active licence.
+ * Branch setup and cross-branch viewing build on top of this in later updates.
+ */
+@Composable
+fun MultiBranchSettingsScreen(
+    onNav: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    val c = PosTheme.colors
+    val context = LocalContext.current
+    var license by remember { mutableStateOf(MultiBranch.license(context)) }
+    var code by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var role by remember { mutableStateOf(BranchIdentity.role(context)) }
+    var branchCode by remember { mutableStateOf(BranchIdentity.code(context)) }
+    var branchName by remember { mutableStateOf(BranchIdentity.name(context)) }
+    var idSaved by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val container = remember { (context.applicationContext as PosApplication).container }
+    val initialFb = remember { FirebaseConfig.config(context) }
+    var projectId by remember { mutableStateOf(initialFb?.projectId ?: "") }
+    var appId by remember { mutableStateOf(initialFb?.appId ?: "") }
+    var apiKey by remember { mutableStateOf(initialFb?.apiKey ?: "") }
+    var email by remember { mutableStateOf(FirebaseConfig.email(context)) }
+    var password by remember { mutableStateOf("") }
+    var syncMsg by remember { mutableStateOf<String?>(null) }
+    var syncing by remember { mutableStateOf(false) }
+
+    NavShell(active = "settings", onNav = onNav) {
+        AppBar(
+            title = "Multi-branch",
+            subtitle = "Link several shops · paid add-on",
+            right = { SecBtn(null, "Back", onBack) },
+        )
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Column(Modifier.widthIn(max = 680.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Card {
+                    Eyebrow("What it is")
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Connect branches and a head office. Each branch keeps selling fully offline; when " +
+                            "online they share read-only reports, stock and sales, so any allowed branch — and " +
+                            "head office — can check the others. This is a paid add-on, unlocked with a licence key.",
+                        fontSize = 12.sp,
+                        color = c.muted,
+                    )
+                }
+
+                val active = license
+                if (active == null) {
+                    Card {
+                        Eyebrow("Activate")
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Enter the licence key you were given. It is tied to your business name and verified " +
+                                "on this device — no internet needed.",
+                            fontSize = 11.sp,
+                            color = c.muted,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        EditableField(
+                            "Licence key",
+                            code,
+                            {
+                                code = it
+                                error = null
+                            },
+                            Modifier.fillMaxWidth(),
+                            mono = true,
+                            placeholder = "NXB-…",
+                        )
+                        error?.let { msg ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(msg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.crimson)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        WideBtn("Activate", primary = true, Modifier.fillMaxWidth(), icon = PosIcons.check) {
+                            val result = MultiBranch.activate(context, code)
+                            if (result == null) {
+                                error =
+                                    "That key isn't valid for “${BusinessProfile.name(context)}”. Make sure it was " +
+                                    "issued for this exact business name."
+                            } else {
+                                license = result
+                                code = ""
+                                error = null
+                            }
+                        }
+                    }
+                } else {
+                    Card {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("●", fontSize = 14.sp, color = c.emerald)
+                            Text("Active", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.emerald)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        InfoRow("Licensed to", active.business)
+                        InfoRow("Branches allowed", active.maxBranches.toString())
+                        InfoRow(
+                            "Expires",
+                            if (active.expiryEpochDay == 0L) "Never" else LocalDate.ofEpochDay(active.expiryEpochDay).toString(),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        WideBtn("Remove licence", primary = false, Modifier.fillMaxWidth()) {
+                            MultiBranch.deactivate(context)
+                            license = null
+                        }
+                    }
+                    Card {
+                        Eyebrow("This shop")
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Tell the network who this device is. Head office can view every branch; a branch " +
+                                "publishes its own sales & stock and views the branches it's allowed to.",
+                            fontSize = 11.sp,
+                            color = c.muted,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text("Role", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            RoleChip("Branch", role == BranchIdentity.Role.BRANCH) {
+                                role = BranchIdentity.Role.BRANCH
+                                idSaved = false
+                            }
+                            RoleChip("Head office", role == BranchIdentity.Role.HQ) {
+                                role = BranchIdentity.Role.HQ
+                                idSaved = false
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        EditableField(
+                            "Branch code (max 4 · e.g. A, HQ, CUR1)",
+                            branchCode,
+                            {
+                                branchCode = BranchIdentity.normalizeCode(it)
+                                idSaved = false
+                            },
+                            Modifier.fillMaxWidth(),
+                            mono = true,
+                            placeholder = "A",
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        EditableField(
+                            "Display name",
+                            branchName,
+                            {
+                                branchName = it
+                                idSaved = false
+                            },
+                            Modifier.fillMaxWidth(),
+                            placeholder = "Curepipe branch",
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        WideBtn(
+                            if (idSaved) "Saved ✓" else "Save this shop",
+                            primary = true,
+                            Modifier.fillMaxWidth(),
+                            icon = PosIcons.check,
+                        ) {
+                            BranchIdentity.set(context, role, branchCode, branchName)
+                            branchCode = BranchIdentity.code(context)
+                            idSaved = true
+                        }
+                    }
+                    Card {
+                        Eyebrow("Cloud sync (Firebase)")
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Connect this shop to your Firebase project so it can share with the other branches. " +
+                                "Copy these three values from the Firebase console (Project settings → your Android " +
+                                "app), then sign in with your business account. See docs/FIREBASE_SETUP.md.",
+                            fontSize = 11.sp,
+                            color = c.muted,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        EditableField("Project ID", projectId, {
+                            projectId = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), mono = true, placeholder = "my-shop-12345")
+                        Spacer(Modifier.height(8.dp))
+                        EditableField("App ID", appId, {
+                            appId = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), mono = true, placeholder = "1:123…:android:abc…")
+                        Spacer(Modifier.height(8.dp))
+                        EditableField("API key", apiKey, {
+                            apiKey = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), mono = true, placeholder = "AIza…")
+                        Spacer(Modifier.height(12.dp))
+                        EditableField("Business email", email, {
+                            email = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), placeholder = "owner@myshop.mu")
+                        Spacer(Modifier.height(8.dp))
+                        EditableField("Password", password, {
+                            password = it
+                            syncMsg = null
+                        }, Modifier.fillMaxWidth(), placeholder = "your account password")
+                        syncMsg?.let { msg ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(msg, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        WideBtn(
+                            if (syncing) "Working…" else "Connect & sync",
+                            primary = true,
+                            Modifier.fillMaxWidth(),
+                            icon = PosIcons.check,
+                        ) {
+                            when {
+                                branchCode.isBlank() -> syncMsg = "Save your branch code above first."
+                                projectId.isBlank() || appId.isBlank() || apiKey.isBlank() || email.isBlank() || password.isBlank() ->
+                                    syncMsg = "Fill in all the Firebase and account fields."
+                                else -> {
+                                    FirebaseConfig.save(context, projectId, appId, apiKey, email)
+                                    syncing = true
+                                    syncMsg = "Connecting…"
+                                    val pwd = password
+                                    scope.launch {
+                                        val result = connectAndSync(container, email.trim(), pwd)
+                                        syncMsg =
+                                            if (result is SyncResult.Ok) {
+                                                com.nexapos.retail.data.branch.BranchSyncWorker.schedule(context)
+                                                "Connected & synced ✓"
+                                            } else {
+                                                "Couldn't sync — check the details and your network."
+                                            }
+                                        syncing = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (branchCode.isNotBlank()) {
+                        WideBtn("View branches", primary = false, Modifier.fillMaxWidth(), icon = PosIcons.home) {
+                            onNav("branches")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(
+    label: String,
+    value: String,
+) {
+    val c = PosTheme.colors
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, fontSize = 13.sp, color = c.muted)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
+    }
+}
+
+@Suppress("TooGenericExceptionCaught") // any sign-in / network error → friendly failure, never a crash
+private suspend fun connectAndSync(
+    container: AppContainer,
+    email: String,
+    password: String,
+): SyncResult =
+    try {
+        container.multiBranchRemoteStore()?.signIn(email, password, createIfNew = true)
+        container.branchSync.syncNow()
+    } catch (e: Exception) {
+        SyncResult.Failed(e.message ?: "Sign-in failed")
+    }
+
+@Composable
+private fun RoleChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = PosTheme.colors
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) c.amber else c.raised2)
+            .border(1.dp, if (selected) c.amber else c.hairline, RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 18.dp, vertical = 9.dp),
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Color.White else c.ink)
+    }
+}
+
+@Composable
+private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val c = PosTheme.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.raised)
+            .border(1.dp, c.hairline, RoundedCornerShape(14.dp))
+            .padding(18.dp),
+        content = content,
+    )
+}

@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
 class RoomReturnsRepository(
     private val saleReturnDao: SaleReturnDao,
 ) : ReturnsRepository {
-    override fun observeRecent(): Flow<List<SaleReturn>> = saleReturnDao.observeRecent()
+    override fun observeRecent(limit: Int): Flow<List<SaleReturn>> = saleReturnDao.observeRecent(limit)
 
     override fun observeTotalSince(since: Long): Flow<Long> = saleReturnDao.observeTotalSince(since)
 
