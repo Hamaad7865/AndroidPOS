@@ -21,6 +21,9 @@ build/
 .kotlin/
 .cxx/
 
+# Developer tooling with secrets (multi-branch licence key generator + private key) — never commit
+/tools/
+
 # Claude Code local state
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
