@@ -9,7 +9,7 @@ interface MoneyRepository {
 
     fun observeExpenses(): Flow<List<MoneyTxn>>
 
-    fun observeRecent(): Flow<List<MoneyTxn>>
+    fun observeRecent(limit: Int = 50): Flow<List<MoneyTxn>>
 
     fun observeSumSince(
         type: String,

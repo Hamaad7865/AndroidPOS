@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.Flow
  * Records and reports completed sales. See ADR-005 in docs/ARCHITECTURE.md.
  */
 interface SalesRepository {
-    /** Most recent sales, newest first. */
-    fun observeRecent(): Flow<List<Sale>>
+    /** Most recent sales, newest first. [limit] caps the row count (default 50). */
+    fun observeRecent(limit: Int = 50): Flow<List<Sale>>
 
     /** Sum of completed-sale totals (minor units) since [since] epoch millis. */
     fun observeTotalSince(since: Long): Flow<Long>

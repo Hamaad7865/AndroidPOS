@@ -247,13 +247,16 @@ class RealBranchSync(
     private suspend fun pushTodayFor(uid: String) {
         val dayStart = SyncBuilders.startOfDay(now(), zone)
         val today = SyncBuilders.dateKey(now(), zone)
+        // Pull a full day's rows, not the 50-row UI default — otherwise a busy branch's
+        // day doc would silently drop sales the summary still counts. DAY_DOC_MAX_ROWS
+        // also bounds the doc under Firestore's 1 MiB limit.
         val todaySales =
-            sales.observeRecent().first().filter { it.createdAt >= dayStart }
+            sales.observeRecent(DAY_DOC_MAX_ROWS).first().filter { it.createdAt >= dayStart }
                 .map { it to sales.itemsForSale(it.id) }
         val todayReturns =
-            returns.observeRecent().first().filter { it.createdAt >= dayStart }
+            returns.observeRecent(DAY_DOC_MAX_ROWS).first().filter { it.createdAt >= dayStart }
                 .map { it to returns.itemsForReturn(it.id) }
-        val todayMoney = money.observeRecent().first().filter { it.createdAt >= dayStart }
+        val todayMoney = money.observeRecent(DAY_DOC_MAX_ROWS).first().filter { it.createdAt >= dayStart }
         val todayShifts =
             shifts.observeHistory().first()
                 .filter { it.status == Shift.STATUS_CLOSED && (it.closedAt ?: 0L) >= dayStart }
@@ -263,5 +266,11 @@ class RealBranchSync(
 
     private fun offline(t: Throwable) {
         _status.value = SyncStatus(SyncState.OFFLINE, lastSyncAt = _status.value.lastSyncAt, message = t.message)
+    }
+
+    private companion object {
+        /** Cap on rows per list in a day doc — covers any realistic single-branch day
+         *  while keeping the document under Firestore's 1 MiB per-doc limit. */
+        const val DAY_DOC_MAX_ROWS = 2_000
     }
 }

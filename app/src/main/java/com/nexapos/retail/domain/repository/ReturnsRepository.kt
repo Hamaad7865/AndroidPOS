@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 /** Records and reports sales returns / refunds. */
 interface ReturnsRepository {
-    fun observeRecent(): Flow<List<SaleReturn>>
+    fun observeRecent(limit: Int = 50): Flow<List<SaleReturn>>
 
     fun observeTotalSince(since: Long): Flow<Long>
 

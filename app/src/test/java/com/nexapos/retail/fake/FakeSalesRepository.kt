@@ -13,7 +13,7 @@ class FakeSalesRepository(
 ) : SalesRepository {
     val recorded = seeded.toMutableList()
 
-    override fun observeRecent(): Flow<List<Sale>> = MutableStateFlow(recorded.map { it.first })
+    override fun observeRecent(limit: Int): Flow<List<Sale>> = MutableStateFlow(recorded.map { it.first }.take(limit))
 
     override fun observeTotalSince(since: Long): Flow<Long> = MutableStateFlow(0L)
 
