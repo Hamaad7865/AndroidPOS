@@ -61,6 +61,7 @@ import com.nexapos.retail.data.barcode.Ean13
 import com.nexapos.retail.data.entity.VatType
 import com.nexapos.retail.data.media.ImageStore
 import com.nexapos.retail.data.profile.BusinessProfile
+import com.nexapos.retail.domain.repository.ProductUsage
 import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.Ean13Bars
 import com.nexapos.retail.ui.components.EditableField
@@ -626,6 +627,7 @@ fun AddProductScreen(
     var imageName by remember { mutableStateOf<String?>(null) }
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var loaded by remember(productId) { mutableStateOf(productId == null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Hardware barcode scanner fills the barcode field, even when it isn't focused.
     LaunchedEffect(Unit) {
@@ -710,6 +712,19 @@ fun AddProductScreen(
             imagePath = imageName,
         )
         onBack()
+    }
+
+    if (showDeleteDialog && productId != null) {
+        DeleteProductDialog(
+            vm = vm,
+            productId = productId,
+            productName = name.ifBlank { "this product" },
+            onDismiss = { showDeleteDialog = false },
+            onDeleted = {
+                showDeleteDialog = false
+                onBack()
+            },
+        )
     }
 
     NavShell(active = "products", onNav = onNav) {
@@ -983,9 +998,96 @@ fun AddProductScreen(
                         if (canPublish) publish()
                     }
                 }
+                if (editing) {
+                    FormCard("Danger zone") {
+                        Text(
+                            "Hide this product from the catalog, or remove it permanently.",
+                            fontSize = 12.sp,
+                            color = c.muted,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(c.crimson)
+                                .clickable { showDeleteDialog = true }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                        ) {
+                            Text("Delete product", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun DeleteProductDialog(
+    vm: CatalogViewModel,
+    productId: Long,
+    productName: String,
+    onDismiss: () -> Unit,
+    onDeleted: () -> Unit,
+) {
+    val c = PosTheme.colors
+    var usage by remember(productId) { mutableStateOf<ProductUsage?>(null) }
+    LaunchedEffect(productId) { usage = vm.productUsage(productId) }
+    val u = usage
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete “$productName”?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                when {
+                    u == null ->
+                        Text("Checking where this product is used…", fontSize = 13.sp, color = c.muted)
+                    u.isUsed -> {
+                        val parts =
+                            buildList {
+                                if (u.sales > 0) add("${u.sales} sale${if (u.sales == 1) "" else "s"}")
+                                if (u.purchases > 0) add("${u.purchases} purchase${if (u.purchases == 1) "" else "s"}")
+                            }.joinToString(" and ")
+                        Text(
+                            "This product is used in $parts.",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = c.crimson,
+                        )
+                        Text(
+                            "Archive hides it from the catalog and POS but keeps those records, returns and reports " +
+                                "intact. Deleting permanently removes it for good and can break restock-on-return and " +
+                                "analytics for those records (printed receipts are unaffected).",
+                            fontSize = 12.sp,
+                            color = c.muted,
+                        )
+                    }
+                    else ->
+                        Text(
+                            "It isn't used in any sales or purchases yet, so it's safe to remove completely — " +
+                                "or just archive (hide) it.",
+                            fontSize = 12.sp,
+                            color = c.muted,
+                        )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = u != null,
+                onClick = { vm.deleteProduct(productId, hard = true, onDone = onDeleted) },
+            ) { Text("Delete permanently", color = c.crimson) }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(
+                    enabled = u != null,
+                    onClick = { vm.deleteProduct(productId, hard = false, onDone = onDeleted) },
+                ) { Text("Archive") }
+            }
+        },
+    )
 }
 
 @Composable

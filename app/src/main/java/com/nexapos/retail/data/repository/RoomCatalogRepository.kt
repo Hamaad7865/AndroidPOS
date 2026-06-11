@@ -7,6 +7,7 @@ import com.nexapos.retail.data.entity.Brand
 import com.nexapos.retail.data.entity.Category
 import com.nexapos.retail.data.entity.Product
 import com.nexapos.retail.domain.repository.CatalogRepository
+import com.nexapos.retail.domain.repository.ProductUsage
 import kotlinx.coroutines.flow.Flow
 
 /** Room-backed [CatalogRepository]. */
@@ -39,4 +40,12 @@ class RoomCatalogRepository(
     ) = productDao.adjustStock(productId, delta)
 
     override suspend fun delete(product: Product) = productDao.delete(product)
+
+    override suspend fun productUsage(productId: Long): ProductUsage =
+        ProductUsage(
+            sales = productDao.saleLineCount(productId),
+            purchases = productDao.purchaseLineCount(productId),
+        )
+
+    override suspend fun archive(productId: Long) = productDao.setArchived(productId)
 }

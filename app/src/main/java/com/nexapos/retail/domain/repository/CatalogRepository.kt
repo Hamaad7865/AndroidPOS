@@ -46,4 +46,18 @@ interface CatalogRepository {
 
     /** Permanently removes a product. */
     suspend fun delete(product: Product)
+
+    /** Counts how many sales / purchases reference [productId] (for the delete warning). */
+    suspend fun productUsage(productId: Long): ProductUsage
+
+    /** Soft-deletes a product: hides it from the catalog/POS but keeps the row + history. */
+    suspend fun archive(productId: Long)
+}
+
+/** How many historical records reference a product — drives the delete-vs-archive warning. */
+data class ProductUsage(
+    val sales: Int,
+    val purchases: Int,
+) {
+    val isUsed: Boolean get() = sales > 0 || purchases > 0
 }
