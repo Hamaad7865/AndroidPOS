@@ -1,4 +1,4 @@
-# NexaPOS — Session Log (2026-06-11): cents refactor + multi-branch Stage 1
+# NexaPOS — Session Log (2026-06-11): cents refactor + multi-branch (Stages 1–5, merged to main)
 
 **Repo:** `C:\Projects\NexaPOS` · default branch `main` (has `origin`).
 **App:** native Kotlin / Jetpack Compose POS, fully offline, SQLCipher-encrypted.
@@ -14,13 +14,30 @@ Two bodies of work this session:
 1. **App-wide money → exact cents (DONE, on `main`, pushed).** Every money field now
    accepts up to 2 decimals and stores exact cents — fixed the reported "50 × 7.50 read
    as 3,750" bug and swept the same class everywhere. 5 commits + 1 follow-up bug-hunt commit.
-2. **Multi-branch paid add-on (ALL 5 STAGES DONE, on `feature/multi-branch`, NOT pushed).** Hybrid
+2. **Multi-branch paid add-on (ALL 5 STAGES DONE, MERGED TO `main`, PUSHED).** Hybrid
    Firebase sync: offline licence gate → branch identity + sync DTOs → Firestore engine → read-only
-   viewing screens → HQ visibility matrix + periodic sync. Full gate green; adversarially reviewed.
-   `versionName` 1.1.0. **Owner still needs to create the Firebase project** (`docs/FIREBASE_SETUP.md`)
-   before real cross-device sync; until then the app runs exactly as before (Firebase never inits).
+   viewing screens → HQ visibility matrix + periodic sync. Full gate green; adversarially reviewed
+   (4 real bugs fixed). `versionCode` 3 / `versionName` 1.1.0. Merged via `--no-ff` (commit
+   `04f43a5`) and pushed to `origin/main`. Latest debug APK installed on the emulator.
+3. **Flutter companion-app prompt (DELIVERED as chat text, not in repo).** A self-contained design
+   prompt for a cross-platform, **read-only** NexaPOS mobile app (reads the same Firestore schema).
+   If wanted again, regenerate from the Workshop-Precision palette + the SyncModels DTO field names.
 
-**Currently checked-out branch: `feature/multi-branch`.** `main` is clean and matches `origin/main`.
+### ⏭️ TOP OPEN ITEM (next session) — Firebase provisioning is wrong for go-to-market
+The owner-facing "Cloud sync (Firebase)" card currently asks the **shop owner** to paste Project ID /
+App ID / API key — that's **vendor plumbing the customer must never see**. Decision: **bake the
+vendor's single Firebase project config into the app at build time** (gitignored `firebase.properties`
+→ `BuildConfig`, like `keystore.properties`), and remove those 3 fields from the UI. Firebase API
+keys are client identifiers, not secrets — isolation is already enforced by `firestore.rules`
+(`request.auth.uid == businessId`) + per-business Auth accounts, so **one shared vendor project with
+one Auth account per business works with zero schema change** (branches in a business share the
+account/uid → same namespace → see each other). **Still undecided (asked, not yet answered):** what
+the owner should see *after* baking — (a) nothing, fully vendor-provisioned + sync section hidden
+behind an admin gesture; (b) a one-time email/password sign-in only; (c) a read-only "Sync: on · last
+synced" status line. See §3 → "Firebase provisioning rework" for the implementation sketch.
+
+**Currently checked-out branch: `main`** (= `origin/main` = `04f43a5`). Working tree clean except two
+untracked scratch files (`AGENTS.md`, `sample-products.csv`) — deliberately NOT committed.
 
 ---
 
@@ -38,14 +55,23 @@ Two bodies of work this session:
 
 (Parent of the cents work is `9aebf1d` — use `git diff 9aebf1d main` to see the whole money refactor.)
 
-### `feature/multi-branch` (local only, NOT pushed) — the add-on
+### Multi-branch add-on — MERGED into `main` and pushed
+`main` is now `04f43a5` (`Merge multi-branch add-on (Stages 1-5) into main`, `--no-ff`), pushed to
+`origin/main`. Stage commits (now on main):
 | Commit | What |
 |---|---|
-| `119fc58` | feat(multi-branch): Stage 1 - offline licence gate |
-| `4ce9b50` | docs: multi-branch design spec + implementation plan |
-| (branches off `95b9961`) | |
+| `04f43a5` | **merge commit** — the whole add-on landed here (revert as a unit: `git revert -m 1 04f43a5`) |
+| `956e586` | fix(multi-branch): day doc captured only 50 rows — sync full day so it matches the summary |
+| `f756055` | Stage 5 — HQ visibility matrix + consolidated view + periodic WorkManager sync; review fixes; v1.1.0 |
+| `ba1456d` | Stage 4 — read-only Branches list + remote branch screens (Overview/Stock/Sales) |
+| `dfb6e99` | Stage 3b — sync hooks + cloud-sync UI + Firebase setup docs + rules |
+| `b583b3b` | Stage 3a — Firebase RemoteStore boundary + tested sync engine |
+| `4a0b625` | Stage 2 — branch identity + pure sync DTOs |
+| `119fc58` | Stage 1 — offline licence gate |
 
-To resume: `git checkout feature/multi-branch`.
+`feature/multi-branch` still exists locally (also at `956e586`, fully contained in `main`) — delete
+anytime with `git branch -d feature/multi-branch`. **No PR was opened** — work went straight to `main`
+at the user's request (a PR now would be empty since everything is already merged).
 
 ---
 
@@ -136,6 +162,34 @@ worth one clean manual confirm.
 (`BranchDirectoryTest`). HQ sees all other branches; a branch sees only the codes the matrix grants.
 **Known v1 limits (accepted):** `observeStock` reads chunk 0 only (<1500 SKUs); 30-day backfill
 deferred; Firestore listener errors are logged, not surfaced as a UI error state.
+
+### ⏭️ Firebase provisioning rework — TOP NEXT ITEM (implementation sketch)
+**Why:** the owner-facing Cloud-sync card exposes Project ID / App ID / API key — vendor plumbing the
+customer must never touch. Move it into the build. (Firebase API keys are client identifiers, not
+secrets; committing them is the normal Firebase model — `google-services.json` is normally committed.)
+
+**Files in play today:**
+- `data/branch/FirebaseConfig.kt` — stores projectId/appId/apiKey/email in encrypted prefs today.
+- `data/branch/FirestoreRemoteStore.kt` — builds the named app "nexapos-mb" from those 3 values.
+- `di/AppContainer.kt` — `multiBranchRemoteStore()` / `remoteBranches()` read `FirebaseConfig.config()`.
+- `ui/settings/MultiBranchSettingsScreen.kt` — the Cloud-sync card (3 fields + email/password + Connect & sync).
+
+**Plan:**
+1. Add gitignored `firebase.properties` (projectId/appId/apiKey); read it in `app/build.gradle.kts`
+   into `BuildConfig` fields — mirror the `keystore.properties` block at the top of that file. Turn on
+   `buildFeatures { buildConfig = true }`.
+2. `FirebaseConfig.config()` sources projectId/appId/apiKey from `BuildConfig`, not prefs (keep
+   email/password — the Auth account is still per-business).
+3. Strip projectId/appId/apiKey fields from `MultiBranchSettingsScreen`. **What stays is the open
+   decision (a/b/c in §0 TL;DR, NOT yet answered):** (a) hide whole card behind an admin gesture; (b)
+   email+password sign-in only; (c) status line only (vendor pre-signs-in).
+4. `firestore.rules` unchanged — already uid-scoped. **One shared vendor Firebase project; one Auth
+   account per business** (branches share the account/uid → same namespace → see each other).
+
+**To build it, the vendor (you) needs once:** create ONE Firebase project, enable Firestore +
+Email/Password Auth, copy that Android app's projectId/appId/apiKey into `firebase.properties`
+(this is `docs/FIREBASE_SETUP.md`, done ONCE by you — not per customer), then create one Auth account
+per business and hand the device over pre-signed-in.
 
 ### Licensing keys (developer-only)
 - Tool: `tools/licensing/LicenseTool.java` (gitignored). `keygen` / `issue` / `verify` modes —
