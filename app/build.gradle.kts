@@ -136,6 +136,13 @@ dependencies {
     implementation(libs.play.services.code.scanner)
     implementation(libs.mlkit.text.recognition)
 
+    // Multi-branch add-on (optional, paid): Firestore + Auth. Initialised lazily from
+    // the owner's pasted config — no google-services plugin / google-services.json.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
+
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.ui.tooling)
