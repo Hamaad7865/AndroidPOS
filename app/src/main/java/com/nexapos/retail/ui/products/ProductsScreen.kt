@@ -60,7 +60,6 @@ import com.nexapos.retail.data.barcode.BarcodeScanner
 import com.nexapos.retail.data.barcode.Ean13
 import com.nexapos.retail.data.entity.VatType
 import com.nexapos.retail.data.media.ImageStore
-import com.nexapos.retail.data.profile.BusinessProfile
 import com.nexapos.retail.domain.repository.ProductUsage
 import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.Ean13Bars
