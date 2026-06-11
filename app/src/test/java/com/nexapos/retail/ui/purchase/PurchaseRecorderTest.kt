@@ -58,6 +58,12 @@ internal class RecorderFakeCatalog(existing: List<Product>) : CatalogRepository 
     override suspend fun delete(product: Product) {
         _products.value = _products.value.filterNot { it.id == product.id }
     }
+
+    override suspend fun productUsage(productId: Long) = com.nexapos.retail.domain.repository.ProductUsage(0, 0)
+
+    override suspend fun archive(productId: Long) {
+        _products.value = _products.value.map { if (it.id == productId) it.copy(isActive = false) else it }
+    }
 }
 
 internal class RecorderFakeParties : PartiesRepository {

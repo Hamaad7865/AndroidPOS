@@ -11,6 +11,7 @@ import com.nexapos.retail.data.MIGRATION_8_9
 import com.nexapos.retail.data.MIGRATION_9_10
 import com.nexapos.retail.data.PosDatabase
 import com.nexapos.retail.data.hardware.drawer.EscPosDrawerKicker
+import com.nexapos.retail.data.hardware.labels.TsplLabelPrinter
 import com.nexapos.retail.data.repository.RoomCatalogRepository
 import com.nexapos.retail.data.repository.RoomMoneyRepository
 import com.nexapos.retail.data.repository.RoomPartiesRepository
@@ -22,6 +23,7 @@ import com.nexapos.retail.data.repository.RoomStaffRepository
 import com.nexapos.retail.data.security.DbKeyManager
 import com.nexapos.retail.data.security.StaffSession
 import com.nexapos.retail.domain.hardware.DrawerKicker
+import com.nexapos.retail.domain.hardware.LabelPrinter
 import com.nexapos.retail.domain.repository.CatalogRepository
 import com.nexapos.retail.domain.repository.MoneyRepository
 import com.nexapos.retail.domain.repository.PartiesRepository
@@ -91,6 +93,11 @@ class AppContainer(context: Context) {
     /** Pulses the receipt printer to pop the cash drawer; no-op until configured. */
     val drawerKicker: DrawerKicker by lazy {
         EscPosDrawerKicker(appContext)
+    }
+
+    /** Prints barcode labels on the thermal label printer (TSPL); fails soft until configured. */
+    val labelPrinter: LabelPrinter by lazy {
+        TsplLabelPrinter(appContext)
     }
 
     val shiftRepository: ShiftRepository by lazy {

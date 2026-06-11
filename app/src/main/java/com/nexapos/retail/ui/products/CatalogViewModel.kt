@@ -9,6 +9,7 @@ import com.nexapos.retail.data.entity.Brand
 import com.nexapos.retail.data.entity.Category
 import com.nexapos.retail.data.entity.Product
 import com.nexapos.retail.domain.repository.CatalogRepository
+import com.nexapos.retail.domain.repository.ProductUsage
 import com.nexapos.retail.ui.sale.MainCat
 import com.nexapos.retail.ui.sale.PosProduct
 import com.nexapos.retail.ui.sale.toCategoryTree
@@ -68,6 +69,28 @@ class CatalogViewModel(private val catalogRepository: CatalogRepository) : ViewM
 
     /** Loads a single product by id — used when opening a row to edit. */
     suspend fun loadProduct(id: Long): Product? = catalogRepository.getProduct(id)
+
+    /** Counts where a product is used, to warn before deleting it. */
+    suspend fun productUsage(id: Long): ProductUsage = catalogRepository.productUsage(id)
+
+    /**
+     * Removes a product. [hard] = true deletes the row permanently; false archives
+     * it (hidden from catalog + POS, history kept). [onDone] runs after it commits.
+     */
+    fun deleteProduct(
+        id: Long,
+        hard: Boolean,
+        onDone: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            if (hard) {
+                catalogRepository.getProduct(id)?.let { catalogRepository.delete(it) }
+            } else {
+                catalogRepository.archive(id)
+            }
+            onDone()
+        }
+    }
 
     /**
      * Saves a product. When [id] is null this inserts a new row; when set it

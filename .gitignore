@@ -21,7 +21,7 @@ build/
 .kotlin/
 .cxx/
 
-# Multi-branch licence generator — keep the private key + tooling out of the repo
+# Developer tooling with secrets (multi-branch licence key generator + private key) — never commit
 /tools/
 
 # Claude Code local state
