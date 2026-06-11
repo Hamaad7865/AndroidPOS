@@ -277,6 +277,7 @@ fun MultiBranchSettingsScreen(
                                         val result = connectAndSync(container, email.trim(), pwd)
                                         syncMsg =
                                             if (result is SyncResult.Ok) {
+                                                com.nexapos.retail.data.branch.BranchSyncWorker.schedule(context)
                                                 "Connected & synced ✓"
                                             } else {
                                                 "Couldn't sync — check the details and your network."

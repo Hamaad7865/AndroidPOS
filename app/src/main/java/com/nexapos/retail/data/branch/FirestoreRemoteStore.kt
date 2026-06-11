@@ -1,6 +1,7 @@
 package com.nexapos.retail.data.branch
 
 import android.content.Context
+import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -72,7 +73,8 @@ class FirestoreRemoteStore(
     override fun observeDoc(path: String): Flow<Map<String, Any?>?> =
         callbackFlow {
             val registration =
-                db.document(path).addSnapshotListener { snapshot, _ ->
+                db.document(path).addSnapshotListener { snapshot, error ->
+                    if (error != null) Log.w("FirestoreRemoteStore", "observeDoc failed: $path", error)
                     trySend(snapshot?.data)
                 }
             awaitClose { registration.remove() }
@@ -81,7 +83,8 @@ class FirestoreRemoteStore(
     override fun observeCollection(collectionPath: String): Flow<List<Map<String, Any?>>> =
         callbackFlow {
             val registration =
-                db.collection(collectionPath).addSnapshotListener { snapshot, _ ->
+                db.collection(collectionPath).addSnapshotListener { snapshot, error ->
+                    if (error != null) Log.w("FirestoreRemoteStore", "observeCollection failed: $collectionPath", error)
                     trySend(snapshot?.documents?.mapNotNull { it.data } ?: emptyList())
                 }
             awaitClose { registration.remove() }

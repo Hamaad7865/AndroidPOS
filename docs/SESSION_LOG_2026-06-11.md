@@ -14,9 +14,11 @@ Two bodies of work this session:
 1. **App-wide money → exact cents (DONE, on `main`, pushed).** Every money field now
    accepts up to 2 decimals and stores exact cents — fixed the reported "50 × 7.50 read
    as 3,750" bug and swept the same class everywhere. 5 commits + 1 follow-up bug-hunt commit.
-2. **Multi-branch paid add-on (IN PROGRESS, on `feature/multi-branch`).** Hybrid Firebase
-   sync design approved; **Stage 1 (offline licence gate) is built, tested, and verified
-   on-device.** Stages 2–5 pending.
+2. **Multi-branch paid add-on (ALL 5 STAGES DONE, on `feature/multi-branch`, NOT pushed).** Hybrid
+   Firebase sync: offline licence gate → branch identity + sync DTOs → Firestore engine → read-only
+   viewing screens → HQ visibility matrix + periodic sync. Full gate green; adversarially reviewed.
+   `versionName` 1.1.0. **Owner still needs to create the Firebase project** (`docs/FIREBASE_SETUP.md`)
+   before real cross-device sync; until then the app runs exactly as before (Firebase never inits).
 
 **Currently checked-out branch: `feature/multi-branch`.** `main` is clean and matches `origin/main`.
 
@@ -110,18 +112,30 @@ tool-issued code. *Minor:* during the test the view bounced to the dashboard rig
 (activation still committed) — likely a stray tap on the laggy cold-booted emu, not a screen bug;
 worth one clean manual confirm.
 
-### Stages 2–5 — PENDING
-- **Stage 2** (no Firebase, needs nothing from owner): `BranchIdentity` (HQ vs branch, code, name)
-  in encrypted prefs + setup card; `SyncModels` pure mappers (summary / stock chunks / per-day
-  sales DTOs), unit-tested. **← natural next step.**
-- **Stage 3** (Firebase): **OWNER must create the Firebase project first** — I'll write
-  `docs/FIREBASE_SETUP.md` (console steps) before any cloud code. Adds `google-services.json`,
-  Firestore rules, upload path (`BranchSync` after sale + shift close + manual + WorkManager),
-  30-day backfill.
-- **Stage 4:** read-only remote screens + nav-rail "Branches" item (deferred from Stage 1; appears
-  only when licensed + admin).
-- **Stage 5:** HQ branch registry + visibility matrix + consolidated "All branches" view, a final
-  Sonnet bug-hunt, docs, bump `versionName` to 1.1.0.
+### Stages 2–5 — ✅ ALL DONE (on `feature/multi-branch`, not pushed)
+- **Stage 2** ✅ — `BranchIdentity` (HQ vs branch, normalized code, name) in encrypted prefs;
+  `SyncModels` pure DTOs (summary / stock chunks / per-day sales+returns+money+shifts) with explicit
+  `toMap()`/`fromMap()`, unit-tested.
+- **Stage 3** ✅ — Firebase WITHOUT google-services plugin: a NAMED app "nexapos-mb" built lazily
+  from 3 owner-pasted values (projectId/appId/apiKey) in encrypted prefs (`FirebaseConfig`).
+  `RemoteStore` boundary + `FirestoreRemoteStore`; `RealBranchSync` (Mutex-serialised, fire-and-forget
+  after sale + shift close, every failure → OFFLINE, never throws into selling). `docs/FIREBASE_SETUP.md`
+  + `firestore.rules` (uid-scoped). Engine fully JVM-tested via `FakeRemoteStore`.
+- **Stage 4** ✅ — read-only viewing: `RemoteBranchRepository` + `FirestoreRemoteBranchRepository`
+  (reads via `RemoteStore`); each branch self-registers a directory doc on sync (`registerSelf`).
+  `BranchesScreen` (viewable list + per-branch live summary + staleness label) and `RemoteBranchScreen`
+  (Overview / Stock / Sales-by-day tabs). Reached from Settings → Multi-branch → **View branches**
+  (gated: admin + licensed + configured) rather than the static nav rail.
+- **Stage 5** ✅ — HQ `VisibilityEditorScreen` (per-branch grant chips, saves whole matrix at
+  `config/visibility`); consolidated "All branches · today" card for HQ; `BranchSyncWorker`
+  (WorkManager periodic ~6 h sync, scheduled on app start + after Connect & sync); adversarial review
+  pass (3 reals fixed: visibility-editor state reset, sync-label clock-skew/ticker, Firestore listener
+  error logging); `versionCode`→3, `versionName`→**1.1.0**.
+
+**Pure visibility/roll-up logic** (`BranchDirectory.viewable` / `consolidate`) is unit-tested
+(`BranchDirectoryTest`). HQ sees all other branches; a branch sees only the codes the matrix grants.
+**Known v1 limits (accepted):** `observeStock` reads chunk 0 only (<1500 SKUs); 30-day backfill
+deferred; Firestore listener errors are logged, not surfaced as a UI error state.
 
 ### Licensing keys (developer-only)
 - Tool: `tools/licensing/LicenseTool.java` (gitignored). `keygen` / `issue` / `verify` modes —
@@ -138,8 +152,8 @@ worth one clean manual confirm.
 1. **Release-build smoke test** — everything was tested on the **debug** APK. Build a signed
    **release** APK (R8/minify on) and smoke-test before giving anything to the owner; minify can
    break Room/reflection in ways debug never shows. *(Highest-priority pre-ship task.)*
-2. **`versionCode` bump** — currently `2` in `app/build.gradle.kts`; bump to `3` (and `versionName`
-   1.0.x) for the next release so the owner's in-place update is unambiguous.
+2. **`versionCode` bump** — ✅ done: now `versionCode = 3`, `versionName = "1.1.0"` in
+   `app/build.gradle.kts` (bumped with multi-branch Stage 5).
 3. **Owner update safety (confirmed):** the owner's install is a release build he signed; a new
    release **signed with the same keystore** updates in place and keeps all data (no schema change).
    A different/lost keystore → signature mismatch → uninstall → data loss. Have him back up first.

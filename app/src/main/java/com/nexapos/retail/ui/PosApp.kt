@@ -23,6 +23,7 @@ import com.nexapos.retail.ui.auth.LoginScreen
 import com.nexapos.retail.ui.auth.SplashScreen
 import com.nexapos.retail.ui.branches.BranchesScreen
 import com.nexapos.retail.ui.branches.RemoteBranchScreen
+import com.nexapos.retail.ui.branches.VisibilityEditorScreen
 import com.nexapos.retail.ui.checkout.PosCheckoutScreen
 import com.nexapos.retail.ui.checkout.PosReceiptScreen
 import com.nexapos.retail.ui.dashboard.DashboardScreen
@@ -417,6 +418,9 @@ fun PosApp() {
         ) { backStackEntry ->
             val code = backStackEntry.arguments?.getString("code").orEmpty()
             RemoteBranchScreen(code = code, onNav = go, onBack = { navController.popBackStack() })
+        }
+        composable("branch-visibility") {
+            VisibilityEditorScreen(onNav = go, onBack = { navController.popBackStack() })
         }
         composable("label-printer-settings") {
             com.nexapos.retail.ui.settings.LabelPrinterSettingsScreen(onNav = go, onBack = { navController.popBackStack() })

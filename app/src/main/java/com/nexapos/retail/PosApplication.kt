@@ -6,6 +6,10 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.nexapos.retail.data.backup.BackupManager
 import com.nexapos.retail.data.backup.BackupWorker
+import com.nexapos.retail.data.branch.BranchIdentity
+import com.nexapos.retail.data.branch.BranchSyncWorker
+import com.nexapos.retail.data.branch.FirebaseConfig
+import com.nexapos.retail.data.branch.MultiBranch
 import com.nexapos.retail.di.AppContainer
 import net.sqlcipher.database.SQLiteDatabase
 import java.util.concurrent.TimeUnit
@@ -22,6 +26,14 @@ class PosApplication : Application() {
         SQLiteDatabase.loadLibs(this)
         container = AppContainer(this)
         scheduleDailyBackup()
+        scheduleBranchSyncIfConfigured()
+    }
+
+    /** Multi-branch background sync — only when the add-on is licensed + fully configured. */
+    private fun scheduleBranchSyncIfConfigured() {
+        if (MultiBranch.licensed(this) && BranchIdentity.isConfigured(this) && FirebaseConfig.isConfigured(this)) {
+            BranchSyncWorker.schedule(this)
+        }
     }
 
     private fun scheduleDailyBackup() {

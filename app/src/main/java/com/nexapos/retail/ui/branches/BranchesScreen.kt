@@ -19,6 +19,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,9 +41,11 @@ import com.nexapos.retail.ui.components.AppBar
 import com.nexapos.retail.ui.components.Eyebrow
 import com.nexapos.retail.ui.components.NavShell
 import com.nexapos.retail.ui.components.SecBtn
+import com.nexapos.retail.ui.components.WideBtn
 import com.nexapos.retail.ui.theme.JetBrainsMono
 import com.nexapos.retail.ui.theme.PosTheme
 import com.nexapos.retail.util.Money
+import kotlinx.coroutines.delay
 
 /**
  * Branches — the read-only list of other shops this install may view. Head office
@@ -93,6 +97,9 @@ fun BranchesScreen(
                 if (isHq && viewable.isNotEmpty()) {
                     ConsolidatedCard(repo, viewable)
                 }
+                if (isHq) {
+                    WideBtn("Manage visibility", primary = false, Modifier.fillMaxWidth()) { onNav("branch-visibility") }
+                }
 
                 if (viewable.isEmpty()) {
                     BranchCardBox {
@@ -110,7 +117,7 @@ fun BranchesScreen(
                     }
                 } else {
                     viewable.forEach { ref ->
-                        BranchSummaryCard(repo, ref) { onOpenBranch(ref.code) }
+                        key(ref.code) { BranchSummaryCard(repo, ref) { onOpenBranch(ref.code) } }
                     }
                 }
             }
@@ -124,7 +131,12 @@ private fun ConsolidatedCard(
     viewable: List<BranchRef>,
 ) {
     val c = PosTheme.colors
-    val states = viewable.map { ref -> remember(ref.code) { repo.observeState(ref.code) }.collectAsState(RemoteBranchState(null, null)).value }
+    val states =
+        viewable.map { ref ->
+            key(ref.code) {
+                remember(ref.code) { repo.observeState(ref.code) }.collectAsState(RemoteBranchState(null, null)).value
+            }
+        }
     val totals = BranchDirectory.consolidate(states.mapNotNull { it.summary })
     BranchCardBox {
         Eyebrow("All branches · today")
@@ -206,7 +218,15 @@ internal fun SyncLabel(lastSyncAt: Long?) {
         Text("Never synced", fontFamily = JetBrainsMono, fontSize = 10.5.sp, color = c.muted)
         return
     }
-    val mins = (System.currentTimeMillis() - lastSyncAt) / 60_000
+    // Tick once a minute so the freshness label ages while the screen stays open.
+    val nowMs by produceState(initialValue = System.currentTimeMillis(), lastSyncAt) {
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(60_000)
+        }
+    }
+    // coerceAtLeast(0): a peer device's clock running ahead must not read as "future".
+    val mins = ((nowMs - lastSyncAt) / 60_000).coerceAtLeast(0)
     val label =
         when {
             mins < 1 -> "just now"
